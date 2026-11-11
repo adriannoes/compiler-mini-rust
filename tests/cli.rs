@@ -19,6 +19,14 @@ fn examples_match_cpp_token_dumps() {
             "examples/hello.mc",
             include_bytes!("fixtures/hello.tokens").as_slice(),
         ),
+        (
+            "examples/lexer.mc",
+            include_bytes!("fixtures/lexer.tokens").as_slice(),
+        ),
+        (
+            "examples/arrays.mc",
+            include_bytes!("fixtures/arrays.tokens").as_slice(),
+        ),
     ] {
         let output = run(&["--tokens", path]);
         assert_eq!(output.status.code(), Some(0), "{path}");
@@ -33,6 +41,10 @@ fn lexical_errors_have_positions_and_no_partial_output() {
         (
             "tests/fixtures/invalid.mc",
             "2:3: error: Unexpected character \"@\".",
+        ),
+        (
+            "tests/fixtures/unpaired_and.mc",
+            "2:17: error: Unexpected character \"&\".",
         ),
         (
             "tests/fixtures/unterminated.mc",

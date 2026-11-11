@@ -7,7 +7,7 @@ Both paths must agree on results, errors, and source positions.
 | Phase | Deliverable | Study topic | Status |
 |-------|-------------|-------------|--------|
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
-| 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | In progress |
+| 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Pending |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Pending |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
@@ -35,7 +35,7 @@ The scanner tracks the byte offset separately from the line and column. A CRLF c
 Inside a comment, the scanner updates the position even though it emits no tokens.
 
 Seven library tests cover the lexical rules. Five command tests cover output, diagnostics, file access, arguments, and help.
-The [expected output files](../tests/fixtures) record the C++ token lists for both examples.
+The [expected output files](../tests/fixtures) record the C++ token lists for the two phase 1 examples.
 The Rust tests read these files directly. They require only Cargo and the Rust toolchain.
 
 ## Phase 2
@@ -45,7 +45,12 @@ The [lexical contract](language.md#lexical-contract) specifies all 35 token kind
 - [x] Record the token spellings, names, and boundaries.
 - [x] Recognize the seven additional keywords and test complete identifier matches.
 - [x] Recognize operators, commas, and brackets. Test comment boundaries and positioned errors.
-- [ ] Compare the token command with C++ on every reference Mini-C example.
+- [x] Compare the token command with C++ on every reference Mini-C example.
+
+The Rust and C++ commands produced identical output, diagnostics, and exit codes for all 17 reference programs.
+The outputs contained 827 tokens across all 35 kinds, including one end token per file.
+Both commands also agreed on 319 byte inputs, including all 256 possible single bytes.
+The [lexer example](../examples/lexer.mc) and [array example](../examples/arrays.mc) together cover all 35 kinds in local command tests.
 
 ### Learning note
 
