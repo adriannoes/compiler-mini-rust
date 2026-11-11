@@ -111,12 +111,92 @@ fn empty_input_and_comments_at_eof() {
 }
 
 #[test]
+fn operators_choose_the_longest_supported_spelling() {
+    use TokenKind::*;
+    assert_tokens(
+        b"=== !== <== >== &&! ||!",
+        &[
+            (EqualEqual, "==", 1, 1),
+            (Assign, "=", 1, 3),
+            (BangEqual, "!=", 1, 5),
+            (Assign, "=", 1, 7),
+            (LessEqual, "<=", 1, 9),
+            (Assign, "=", 1, 11),
+            (GreaterEqual, ">=", 1, 13),
+            (Assign, "=", 1, 15),
+            (AndAnd, "&&", 1, 17),
+            (Bang, "!", 1, 19),
+            (OrOr, "||", 1, 21),
+            (Bang, "!", 1, 23),
+            (Eof, "", 1, 24),
+        ],
+    );
+}
+
+#[test]
+fn unsupported_compound_operators_split_into_individual_tokens() {
+    use TokenKind::*;
+    assert_tokens(
+        b"-42,++--+=/=",
+        &[
+            (Minus, "-", 1, 1),
+            (Integer, "42", 1, 2),
+            (Comma, ",", 1, 4),
+            (Plus, "+", 1, 5),
+            (Plus, "+", 1, 6),
+            (Minus, "-", 1, 7),
+            (Minus, "-", 1, 8),
+            (Plus, "+", 1, 9),
+            (Assign, "=", 1, 10),
+            (Slash, "/", 1, 11),
+            (Assign, "=", 1, 12),
+            (Eof, "", 1, 13),
+        ],
+    );
+}
+
+#[test]
+fn comments_and_spaces_separate_operators() {
+    use TokenKind::*;
+    assert_tokens(
+        b"=/**/= = = 8/**//2// line\r\n/\t/*\xff*/ /",
+        &[
+            (Assign, "=", 1, 1),
+            (Assign, "=", 1, 6),
+            (Assign, "=", 1, 8),
+            (Assign, "=", 1, 10),
+            (Integer, "8", 1, 12),
+            (Slash, "/", 1, 17),
+            (Integer, "2", 1, 18),
+            (Slash, "/", 2, 1),
+            (Slash, "/", 2, 9),
+            (Eof, "", 2, 10),
+        ],
+    );
+}
+
+#[test]
+fn incomplete_logical_operators_report_the_unpaired_byte() {
+    for (input, byte, column) in [
+        (b"&&&".as_slice(), b'&', 3),
+        (b"|||", b'|', 3),
+        (b"&/**/&", b'&', 1),
+        (b"| |", b'|', 1),
+    ] {
+        let error = lex(input).unwrap_err();
+        assert_eq!(error.kind, LexErrorKind::UnexpectedByte(byte));
+        assert_eq!(error.position, Position { line: 1, column });
+    }
+}
+
+#[test]
 fn unsupported_bytes_report_the_first_position_and_exact_message() {
     for (byte, message) in [
         (b'@', "Unexpected character \"@\"."),
         (b'"', "Unexpected character \"\\\"\"."),
         (b'\\', "Unexpected character \"\\\\\"."),
-        (b'/', "Unexpected character \"/\"."),
+        (b'&', "Unexpected character \"&\"."),
+        (b'|', "Unexpected character \"|\"."),
         (0, "Unexpected byte 0x00."),
         (0xff, "Unexpected byte 0xFF."),
     ] {

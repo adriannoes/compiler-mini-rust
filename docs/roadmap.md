@@ -44,8 +44,16 @@ The [lexical contract](language.md#lexical-contract) specifies all 35 token kind
 
 - [x] Record the token spellings, names, and boundaries.
 - [x] Recognize the seven additional keywords and test complete identifier matches.
-- [ ] Recognize operators, commas, and brackets. Test comment boundaries and positioned errors.
+- [x] Recognize operators, commas, and brackets. Test comment boundaries and positioned errors.
 - [ ] Compare the token command with C++ on every reference Mini-C example.
+
+### Learning note
+
+A finite automaton recognizes input by moving between a fixed set of states.
+After the first `=`, the scanner can accept `ASSIGN`. A second adjacent `=` extends the token to `EQUAL_EQUAL`.
+This rule picks the longest supported match. A single byte of lookahead suffices for every Mini-C operator.
+After `&`, only another `&` completes a token. A different byte or the end of input produces an error at the first `&`.
+A slash followed by `/` or `*` starts a comment. The scanner resumes token recognition after the comment ends.
 
 ## Execution contracts for later phases
 

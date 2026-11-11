@@ -110,6 +110,52 @@ impl Scanner<'_> {
         }
     }
 
+    fn take(&mut self, expected: u8) -> bool {
+        if self.peek() == Some(expected) {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn scan_symbol(&mut self, byte: u8) -> Result<TokenKind, LexError> {
+        let position = self.position;
+        self.advance();
+        let kind = match byte {
+            b'(' => TokenKind::LeftParen,
+            b')' => TokenKind::RightParen,
+            b'{' => TokenKind::LeftBrace,
+            b'}' => TokenKind::RightBrace,
+            b'[' => TokenKind::LeftBracket,
+            b']' => TokenKind::RightBracket,
+            b';' => TokenKind::Semicolon,
+            b',' => TokenKind::Comma,
+            b'+' => TokenKind::Plus,
+            b'-' => TokenKind::Minus,
+            b'*' => TokenKind::Star,
+            b'/' => TokenKind::Slash,
+            b'%' => TokenKind::Percent,
+            b'=' if self.take(b'=') => TokenKind::EqualEqual,
+            b'=' => TokenKind::Assign,
+            b'!' if self.take(b'=') => TokenKind::BangEqual,
+            b'!' => TokenKind::Bang,
+            b'<' if self.take(b'=') => TokenKind::LessEqual,
+            b'<' => TokenKind::Less,
+            b'>' if self.take(b'=') => TokenKind::GreaterEqual,
+            b'>' => TokenKind::Greater,
+            b'&' if self.take(b'&') => TokenKind::AndAnd,
+            b'|' if self.take(b'|') => TokenKind::OrOr,
+            _ => {
+                return Err(LexError {
+                    position,
+                    kind: LexErrorKind::UnexpectedByte(byte),
+                });
+            }
+        };
+        Ok(kind)
+    }
+
     fn next_token(&mut self) -> Result<Token, LexError> {
         let start = self.offset;
         let position = self.position;
@@ -141,23 +187,7 @@ impl Scanner<'_> {
                 }
                 TokenKind::Integer
             }
-            Some(byte) => {
-                let kind = match byte {
-                    b'(' => TokenKind::LeftParen,
-                    b')' => TokenKind::RightParen,
-                    b'{' => TokenKind::LeftBrace,
-                    b'}' => TokenKind::RightBrace,
-                    b';' => TokenKind::Semicolon,
-                    _ => {
-                        return Err(LexError {
-                            position,
-                            kind: LexErrorKind::UnexpectedByte(byte),
-                        });
-                    }
-                };
-                self.advance();
-                kind
-            }
+            Some(byte) => self.scan_symbol(byte)?,
         };
         let text = str::from_utf8(&self.source[start..self.offset])
             .expect("Token text contains only ASCII bytes.")
