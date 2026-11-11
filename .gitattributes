@@ -1,0 +1,3 @@
+tests/fixtures/*.tokens text eol=lf
+tests/fixtures/*.ast text eol=lf
+tests/fixtures/*.resolution text eol=lf
