@@ -1,0 +1,18 @@
+Resolution
+  Scope #0 GLOBAL @1:1
+  Scope #1 FUNCTION parent=#0 @2:5
+  Scope #2 BLOCK parent=#1 @4:3
+  Scope #3 FUNCTION parent=#0 @11:5
+  Symbol #0 FUNCTION "main" scope=#0 @2:5
+  Symbol #1 FUNCTION "later" scope=#0 @11:5
+  Symbol #2 VARIABLE "value" scope=#1 @3:7
+  Symbol #3 VARIABLE "copy" scope=#2 @5:9
+  Symbol #4 VARIABLE "value" scope=#2 @6:9
+  Symbol #5 PARAMETER "input" scope=#3 @11:15
+  Call "later" scope=#1 @3:15 -> Symbol #1 @11:5
+  Read "value" scope=#2 @5:16 -> Symbol #2 @3:7
+  Read "copy" scope=#2 @6:17 -> Symbol #3 @5:9
+  Write "value" scope=#2 @7:5 -> Symbol #4 @6:9
+  Read "value" scope=#2 @7:13 -> Symbol #4 @6:9
+  Read "value" scope=#1 @9:10 -> Symbol #2 @3:7
+  Read "input" scope=#3 @12:10 -> Symbol #5 @11:15

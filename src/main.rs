@@ -1,28 +1,32 @@
 use std::env;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use compiler_mini_rust::{lex, parse};
+use compiler_mini_rust::{Position, lex, parse, resolve_names};
+
+const MODES: &[&str] = &["--tokens", "--ast", "--resolve"];
 
 fn run() -> Result<(), String> {
     let mut args = env::args_os().skip(1);
-    let (ast, path) = match (args.next(), args.next(), args.next()) {
-        (Some(mode), None, None) if mode == "--help" || mode == "-h" => {
-            println!(
-                "Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>"
-            );
-            return Ok(());
+    let flag = args.next();
+    let flag = flag.as_deref().and_then(OsStr::to_str);
+    let path = args.next();
+    if matches!(flag, Some("--help" | "-h")) && path.is_none() {
+        println!("Usage: compiler-mini-rust --tokens <file>");
+        for mode in &MODES[1..] {
+            println!("       compiler-mini-rust {mode} <file>");
         }
-        (Some(mode), Some(path), None) if mode == "--tokens" => (false, path),
-        (Some(mode), Some(path), None) if mode == "--ast" => (true, path),
-        (Some(mode), _, _) if mode == "--ast" => {
-            return Err("minic: error: Expected --ast <file>. Use --help for usage.".to_owned());
-        }
-        _ => {
-            return Err("minic: error: Expected --tokens <file>. Use --help for usage.".to_owned());
-        }
+        return Ok(());
+    }
+    let known = flag.filter(|f| MODES.contains(f));
+    let (Some(mode), Some(path), None) = (known, path, args.next()) else {
+        let expected = known.unwrap_or("--tokens");
+        return Err(format!(
+            "minic: error: Expected {expected} <file>. Use --help for usage."
+        ));
     };
     let path = Path::new(&path);
     let mut file =
@@ -30,27 +34,13 @@ fn run() -> Result<(), String> {
     let mut source = Vec::new();
     file.read_to_end(&mut source)
         .map_err(|_| format!("{}: error: Cannot read file.", path.display()))?;
-    let tokens = lex(&source).map_err(|e| {
-        format!(
-            "{}:{}:{}: error: {e}",
-            path.display(),
-            e.position.line,
-            e.position.column
-        )
-    })?;
+    let diagnostic = |position: Position, error: &dyn std::fmt::Display| {
+        format!("{}:{position}: error: {error}", path.display())
+    };
+    let tokens = lex(&source).map_err(|e| diagnostic(e.position, &e))?;
 
     let mut output = BufWriter::new(io::stdout().lock());
-    if ast {
-        let program = parse(&tokens).map_err(|e| {
-            format!(
-                "{}:{}:{}: error: {e}",
-                path.display(),
-                e.position.line,
-                e.position.column
-            )
-        })?;
-        write!(output, "{program}").map_err(|e| e.to_string())?;
-    } else {
+    if mode == "--tokens" {
         for token in tokens {
             writeln!(
                 output,
@@ -61,6 +51,14 @@ fn run() -> Result<(), String> {
                 token.text
             )
             .map_err(|e| e.to_string())?;
+        }
+    } else {
+        let program = parse(&tokens).map_err(|e| diagnostic(e.position, &e))?;
+        if mode == "--resolve" {
+            let resolution = resolve_names(&program).map_err(|e| diagnostic(e.position, &e))?;
+            write!(output, "{resolution}").map_err(|e| e.to_string())?;
+        } else {
+            write!(output, "{program}").map_err(|e| e.to_string())?;
         }
     }
     output.flush().map_err(|e| e.to_string())

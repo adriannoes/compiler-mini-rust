@@ -1,0 +1,14 @@
+Resolution
+  Scope #0 GLOBAL @1:1
+  Scope #1 FUNCTION parent=#0 @2:6
+  Scope #2 FUNCTION parent=#0 @6:6
+  Symbol #0 FUNCTION "even" scope=#0 @2:6
+  Symbol #1 FUNCTION "odd" scope=#0 @6:6
+  Symbol #2 PARAMETER "n" scope=#1 @2:15
+  Symbol #3 PARAMETER "n" scope=#2 @6:14
+  Read "n" scope=#1 @3:7 -> Symbol #2 @2:15
+  Call "odd" scope=#1 @4:10 -> Symbol #1 @6:6
+  Read "n" scope=#1 @4:14 -> Symbol #2 @2:15
+  Read "n" scope=#2 @7:7 -> Symbol #3 @6:14
+  Call "even" scope=#2 @8:10 -> Symbol #0 @2:6
+  Read "n" scope=#2 @8:15 -> Symbol #3 @6:14

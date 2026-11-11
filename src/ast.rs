@@ -13,7 +13,7 @@ pub struct Name {
     pub position: Position,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TypeSyntax {
     pub keyword: TokenKind,
     pub position: Position,

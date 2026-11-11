@@ -99,7 +99,7 @@ The [parsing exercises](parsing.md) compare top-down decisions with a bottom-up 
 The [name rules](language.md#scalar-name-resolution) and [type rules](language.md#scalar-type-analysis) define the scalar analysis commands.
 
 - [x] Record visibility, types, diagnostic order, and return guarantees.
-- [ ] Resolve names and print scopes, declarations, and uses.
+- [x] Resolve names and print scopes, declarations, and uses.
 - [ ] Check function signatures, expression types, statements, and return paths.
 - [ ] Compare both commands with C++ and record the study results.
 

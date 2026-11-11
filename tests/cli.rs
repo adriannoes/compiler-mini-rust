@@ -150,13 +150,39 @@ fn ast_requires_one_file() {
 }
 
 #[test]
-fn help_lists_both_commands() {
+fn resolution_matches_cpp_and_reports_the_first_name_error() {
+    for (path, expected) in [
+        (
+            "examples/scopes.mc",
+            include_bytes!("fixtures/scopes.resolution").as_slice(),
+        ),
+        (
+            "examples/recursion.mc",
+            include_bytes!("fixtures/recursion.resolution").as_slice(),
+        ),
+    ] {
+        let output = run(&["--resolve", path]);
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(output.stdout, expected);
+        assert!(output.stderr.is_empty());
+    }
+    let output = run(&["--resolve", "examples/expressions.mc"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        output.stderr,
+        b"examples/expressions.mc:9:10: error: Undeclared name \"left\".\n"
+    );
+}
+
+#[test]
+fn help_lists_analysis_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n"
         );
         assert!(output.stderr.is_empty());
     }
