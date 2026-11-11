@@ -1,25 +1,48 @@
 # Mini-C in Rust
 
-This repository starts a second Mini-C compiler study, with Rust as the proposed implementation language.
-The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides a reference for language behavior and example programs.
+This project implements Mini-C in Rust as a compiler study. The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides the language rules and reference programs.
+The first phase delivers a lexer. A lexer separates source bytes into tokens such as names, keywords, and punctuation.
+The [roadmap](docs/roadmap.md) tracks the interpreter, bytecode compiler, and virtual machine.
 
-The goal is to compare implementation choices while keeping the Mini-C language consistent.
-Rust adds practice with ownership, which controls value storage and lifetime.
-Enums can represent tokens and syntax tree nodes with distinct variants.
+## Inspect a program
 
-## Proposed progression
+With Rust and Cargo installed, run this command from the repository root.
 
-1. Set up Cargo and implement a lexer that separates source text into tokens.
-2. Parse tokens into a syntax tree and analyze names and types.
-3. Interpret programs and compare their results with the C++ implementation.
-4. Compile programs to bytecode and implement a virtual machine.
-5. Add optimizations and arrays in separate increments.
+```sh
+cargo run --quiet -- --tokens examples/return_42.mc
+```
 
-Each increment will include focused tests, examples, and a short learning note.
+The command lists the tokens in the [example](examples/return_42.mc).
 
-## First proposed increment
+```text
+1:1 INT "int"
+1:5 IDENTIFIER "main"
+1:9 LEFT_PAREN "("
+1:10 RIGHT_PAREN ")"
+1:12 LEFT_BRACE "{"
+2:3 RETURN "return"
+2:10 INTEGER "42"
+2:12 SEMICOLON ";"
+3:1 RIGHT_BRACE "}"
+4:1 EOF ""
+```
 
-Start with integer literals, identifiers, `int`, `return`, punctuation, whitespace, and comments.
-Each token will include its kind, source text, line, and column.
-The first example will be `int main() { return 42; }`.
-The lexer will report unsupported characters and unterminated comments.
+The number `42` starts at line 2, byte column 10. The final newline places the end of input at line 4, column 1.
+The lexer preserves the digits as text. The interpreter will convert those digits when it evaluates the literal.
+
+## Library and command
+
+The [lexer](src/lexer.rs) borrows the source bytes. Each [token](src/token.rs) owns its text, so callers can keep tokens after they release the source.
+The library returns either the complete token list or a positioned error.
+The [command](src/main.rs) reads the file and prints the result. It adds the file path to a lexical error.
+
+## Tests
+
+From the repository root, run the local tests.
+
+```sh
+cargo test
+```
+
+The tests use the Rust standard library. Command tests compare both examples with expected output from the C++ implementation.
+The [lexical contract](docs/language.md) specifies the supported tokens, positions, and diagnostics.

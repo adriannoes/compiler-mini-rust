@@ -18,6 +18,23 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Int => "INT",
+            Self::Return => "RETURN",
+            Self::Identifier => "IDENTIFIER",
+            Self::Integer => "INTEGER",
+            Self::LeftParen => "LEFT_PAREN",
+            Self::RightParen => "RIGHT_PAREN",
+            Self::LeftBrace => "LEFT_BRACE",
+            Self::RightBrace => "RIGHT_BRACE",
+            Self::Semicolon => "SEMICOLON",
+            Self::Eof => "EOF",
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,
