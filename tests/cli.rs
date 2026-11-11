@@ -88,13 +88,67 @@ fn invalid_arguments_report_usage() {
 }
 
 #[test]
-fn help_lists_the_token_command() {
+fn examples_match_cpp_syntax_trees() {
+    for (path, expected) in [
+        (
+            "examples/hello.mc",
+            include_bytes!("fixtures/hello.ast").as_slice(),
+        ),
+        (
+            "examples/expressions.mc",
+            include_bytes!("fixtures/expressions.ast").as_slice(),
+        ),
+    ] {
+        let output = run(&["--ast", path]);
+        assert_eq!(output.status.code(), Some(0), "{path}");
+        assert_eq!(output.stdout, expected, "{path}");
+        assert!(output.stderr.is_empty(), "{path}");
+    }
+}
+
+#[test]
+fn ast_reports_errors_without_a_partial_tree() {
+    for (path, error) in [
+        (
+            "tests/fixtures/syntax_error.mc",
+            "2:1: error: Expected \";\" after return value. Received RIGHT_BRACE.",
+        ),
+        (
+            "tests/fixtures/lex_before_syntax.mc",
+            "2:1: error: Unexpected character \"@\".",
+        ),
+    ] {
+        let output = run(&["--ast", path]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert_eq!(output.stderr, format!("{path}:{error}\n").as_bytes());
+    }
+    let tokens = run(&["--tokens", "tests/fixtures/syntax_error.mc"]);
+    assert_eq!(tokens.status.code(), Some(0));
+    assert!(tokens.stderr.is_empty());
+}
+
+#[test]
+fn ast_requires_one_file() {
+    for args in [&["--ast"][..], &["--ast", "file", "extra"]] {
+        let output = run(args);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            output.stderr,
+            b"minic: error: Expected --ast <file>. Use --help for usage.\n"
+        );
+    }
+}
+
+#[test]
+fn help_lists_both_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n"
         );
         assert!(output.stderr.is_empty());
     }

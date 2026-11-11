@@ -1,0 +1,44 @@
+Program
+  Function "arithmetic" @2:5
+    Type INT @2:1
+    Block @2:18
+      Return @3:3
+        Binary MINUS @3:25
+          Binary STAR @3:20
+            Binary PLUS @3:15
+              Integer "007" @3:11
+              Integer "2" @3:17
+            Unary MINUS @3:22
+              Integer "3" @3:23
+          Binary PERCENT @3:33
+            Binary SLASH @3:29
+              Integer "4" @3:27
+              Integer "2" @3:31
+            Integer "2" @3:35
+  Function "logic" @5:6
+    Type BOOL @5:1
+    Block @5:14
+      Return @6:3
+        Binary OR_OR @6:17
+          Unary BANG @6:10
+            Boolean false @6:11
+          Binary AND_AND @6:25
+            Boolean true @6:20
+            Binary EQUAL_EQUAL @6:42
+              Binary LESS @6:38
+                Binary PLUS @6:30
+                  Integer "1" @6:28
+                  Binary STAR @6:34
+                    Integer "2" @6:32
+                    Integer "3" @6:36
+                Integer "8" @6:40
+              Boolean true @6:45
+  Function "assignment" @8:5
+    Type INT @8:1
+    Block @8:18
+      Return @9:3
+        Assign @9:15
+          Name "left" @9:10
+          Assign @9:23
+            Name "right" @9:17
+            Integer "123456789012345678901234567890" @9:25

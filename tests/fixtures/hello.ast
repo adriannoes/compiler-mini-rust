@@ -1,0 +1,6 @@
+Program
+  Function "main" @3:5
+    Type INT @3:1
+    Block @3:12
+      Return @4:3
+        Integer "0" @4:10

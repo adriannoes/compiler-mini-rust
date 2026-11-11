@@ -65,7 +65,7 @@ A slash followed by `/` or `*` starts a comment. The scanner resumes token recog
 The [scalar grammar](language.md#scalar-syntax) defines the input and output of the parser.
 
 - [x] Record the grammar, positions, and error contract.
-- [ ] Parse expressions, blocks, and functions without parameters. Print their trees.
+- [x] Parse expressions, blocks, and functions without parameters. Print their trees.
 - [ ] Parse declarations, parameters, and named calls.
 - [ ] Parse conditionals and loops. Compare scalar trees and errors with C++.
 - [ ] Work through FIRST and FOLLOW sets and a shift/reduce example.
