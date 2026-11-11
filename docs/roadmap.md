@@ -7,7 +7,7 @@ Both paths must agree on results, errors, and source positions.
 | Phase | Deliverable | Study topic | Status |
 |-------|-------------|-------------|--------|
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
-| 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Pending |
+| 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | In progress |
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Pending |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Pending |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
@@ -37,6 +37,15 @@ Inside a comment, the scanner updates the position even though it emits no token
 Seven library tests cover the lexical rules. Five command tests cover output, diagnostics, file access, arguments, and help.
 The [expected output files](../tests/fixtures) record the C++ token lists for both examples.
 The Rust tests read these files directly. They require only Cargo and the Rust toolchain.
+
+## Phase 2
+
+The [lexical contract](language.md#lexical-contract) specifies all 35 token kinds, including both brackets.
+
+- [x] Record the token spellings, names, and boundaries.
+- [ ] Recognize the seven additional keywords and test complete identifier matches.
+- [ ] Recognize operators, commas, and brackets. Test comment boundaries and positioned errors.
+- [ ] Compare the token command with C++ on every reference Mini-C example.
 
 ## Execution contracts for later phases
 

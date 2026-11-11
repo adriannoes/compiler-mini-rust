@@ -1,17 +1,25 @@
 # Mini-C language
 
-## Phase 1 lexical contract
+## Lexical contract
 
 The lexer reads source bytes from left to right. Each token has a kind, its original text, and its starting position.
 
 | Kind | Source text |
 |------|-------------|
-| `INT`, `RETURN` | The complete lowercase words `int` and `return` |
+| `INT`, `BOOL`, `VOID` | `int`, `bool`, `void` |
+| `IF`, `ELSE`, `WHILE`, `RETURN` | `if`, `else`, `while`, `return` |
+| `TRUE`, `FALSE` | `true`, `false` |
 | `IDENTIFIER` | An ASCII letter or underscore followed by zero or more ASCII letters, digits, or underscores |
 | `INTEGER` | One or more ASCII decimal digits |
 | `LEFT_PAREN`, `RIGHT_PAREN` | `(`, `)` |
 | `LEFT_BRACE`, `RIGHT_BRACE` | `{`, `}` |
-| `SEMICOLON` | `;` |
+| `LEFT_BRACKET`, `RIGHT_BRACKET` | `[`, `]` |
+| `SEMICOLON`, `COMMA` | `;`, `,` |
+| `ASSIGN` | `=` |
+| `PLUS`, `MINUS`, `STAR`, `SLASH`, `PERCENT` | `+`, `-`, `*`, `/`, `%` |
+| `EQUAL_EQUAL`, `BANG_EQUAL` | `==`, `!=` |
+| `LESS`, `LESS_EQUAL`, `GREATER`, `GREATER_EQUAL` | `<`, `<=`, `>`, `>=` |
+| `BANG`, `AND_AND`, `OR_OR` | `!`, `&&`, `\|\|` |
 | `EOF` | Empty text at the end of the input |
 
 The lexer reads a complete identifier before it tests for a keyword. For example, `int2` and `Return` are identifiers.
@@ -21,6 +29,15 @@ The lexer skips ASCII spaces, tabs, vertical tabs, form feeds, and line endings.
 A line comment starts with `//` and ends at a line ending or the end of input.
 A block comment starts with `/*` and ends at the first `*/`. Block comments do not nest.
 Comments separate tokens, so `int/**/return` produces two keywords.
+
+A slash starts a division token unless the next byte makes it part of a comment.
+The lexer takes the longest supported operator at each position. For example, `===` produces `EQUAL_EQUAL` and then `ASSIGN`.
+In `=/**/=`, the comment separates two `ASSIGN` tokens.
+A single `&` or `|` produces a lexical error at that byte.
+
+The sign and digits form separate tokens. For example, `-42` produces `MINUS` and `INTEGER`.
+The lexer splits `++`, `--`, `+=`, and `/=` into their individual operators.
+It recognizes brackets anywhere in the input. Later phases determine which uses of brackets are valid.
 
 Lines and columns start at 1. Columns count bytes, including bytes inside comments. A tab advances one column.
 Each LF, CR, or CRLF advances one line and resets the column to 1.
