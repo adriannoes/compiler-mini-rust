@@ -3,7 +3,8 @@
 This project implements Mini-C in Rust as a compiler study. The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides the language rules and reference programs.
 The lexer separates source bytes into 35 kinds of tokens, including keywords, identifiers, operators, and the end of input.
 The parser builds an abstract syntax tree (AST) for scalar programs. Semantic analysis connects names to declarations and checks types.
-The interpreter executes the scalar AST. The [roadmap](docs/roadmap.md) records the completed phases and the plans for bytecode and a virtual machine.
+The interpreter executes the scalar AST. The bytecode compiler translates the same tree into instructions for a stack virtual machine (VM).
+The [roadmap](docs/roadmap.md) records the study phases.
 
 ## Run a program
 
@@ -28,6 +29,19 @@ The first command succeeds. The second exits with status 1 and writes this diagn
 ```text
 examples/runtime_error.mc:3:15: error: The variable "value" has no value.
 ```
+
+### Inspect and execute bytecode
+
+To see how a recursive call works, compile the [factorial example](examples/factorial.mc) and run it on the VM.
+
+```sh
+cargo run --quiet -- --bytecode examples/factorial.mc
+cargo run --quiet -- --run-vm examples/factorial.mc
+```
+
+The listing contains `CALL 0` for a call to `factorial`. The VM prints `720` and exits with status 0.
+Use [control_flow.mc](examples/control_flow.mc) to inspect a conditional jump and a backward loop jump.
+That file compiles on its own. Execution requires a `main` function.
 
 ## Inspect a program
 
@@ -118,6 +132,9 @@ The [parser](src/parser.rs) borrows the tokens and returns an owned tree or a po
 The [resolver](src/resolver.rs) records a symbol for each read, write, and call. The [type checker](src/type_checker.rs) uses those symbols to check expressions and returns.
 Call `interpret(&program, "main")` to execute the tree. Use `interpret_with_limits` to specify a step budget and a call depth limit.
 The [interpreter](src/interpreter.rs) returns an owned `Value` or an `InterpretError`.
+Call `compile_bytecode(&program)` to create an owned `BytecodeProgram`.
+Call `execute_bytecode(&bytecode, "main")` to run it. Use `execute_bytecode_with_limits` to set the VM limits.
+The [instruction reference](docs/language.md#bytecode-and-virtual-machine) describes the listing and stack operations.
 The [command](src/main.rs) prints the result of the selected stage or adds the file path to its first diagnostic.
 
 ## Tests

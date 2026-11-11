@@ -244,3 +244,38 @@ The command reports the first source error as `path:line:column: error: message`
 | Zero divisor | Division or remainder operator | `The divisor is zero.` |
 | Step limit | Next statement or expression | `The execution step limit was reached.` |
 | Call depth limit | Function name at the call site | `The call depth limit was reached.` |
+
+## Bytecode and virtual machine
+
+Use `--bytecode <file>` to compile scalar source and print its instructions.
+The compiler checks names and types in every function before it emits code.
+A successful command prints the complete listing and exits with status 0.
+An empty program prints `bytecode` and a newline. Compilation accepts functions with parameters and programs without `main`.
+A static error exits with status 1 and leaves standard output empty.
+
+Functions appear in source order. Each function lists its local slots, constants, and numbered instructions.
+Parameters occupy the first slots in declaration order. Each local declaration gets its own slot, including an inner declaration that hides an outer variable.
+A jump specifies an absolute instruction index in the same function. A call specifies a function index in the program.
+Instructions record the original source positions. Integer constants keep their decimal digits and the sign of a direct unary minus.
+
+| Instruction | Effect |
+|-------------|--------|
+| `STEP` | Consume one source step before evaluating the next source node. |
+| `LOAD_CONSTANT` | Convert the selected constant and push its value. |
+| `RESET_LOCAL`, `LOAD_LOCAL`, `STORE_LOCAL` | Clear a slot, push its value, or copy the top value into the slot. A store retains the value on the stack. |
+| `POP` | Discard the top value. |
+| `NEGATE`, `NOT` | Replace the top value with the unary result. |
+| `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `REMAINDER` | Pop the right and left operands and push the checked integer result. |
+| `EQUAL`, `NOT_EQUAL`, `LESS`, `LESS_EQUAL`, `GREATER`, `GREATER_EQUAL` | Pop the right and left operands and push the boolean result. |
+| `JUMP`, `JUMP_IF_FALSE`, `JUMP_IF_TRUE` | Select the next instruction. Each conditional jump consumes its boolean operand. |
+| `CALL` | Move the argument values into parameter slots and start the called function. |
+| `RETURN`, `RETURN_VOID` | End the current call. Only a non-void result supplies a value to the caller. |
+| `UNREACHABLE` | Mark the end of a non-void body. Static return checks prevent execution from reaching this instruction. |
+
+Use `--run-vm <file>` to compile the source and execute `main` on the VM.
+The VM follows the [scalar execution rules](#scalar-execution) for values, limits, diagnostics, and exit status.
+Only `STEP` consumes the source budget. A conditional jump can skip the entire right operand of a logical expression, including its steps.
+The VM converts a literal when it executes `LOAD_CONSTANT`. Skipped literals and arithmetic produce no runtime errors.
+
+For example, `--bytecode examples/runtime_error.mc` succeeds. Its listing contains `RESET_LOCAL 0` followed by a read of that slot.
+With `--run-vm`, the read fails at line 3, column 15.

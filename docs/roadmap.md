@@ -11,7 +11,7 @@ Both paths must agree on results, errors, and source positions.
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Complete |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Complete |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Complete |
-| 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
+| 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Complete |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Pending |
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Pending |
 
@@ -179,7 +179,40 @@ The [runtime tests](../src/runtime.rs) check operator positions and distinguish 
 The file comparison used regular files. On the validation host, Rust reported `Cannot read file.` for a directory.
 The C++ executable treated the same directory as an empty program.
 
+## Phase 6
+
+The [bytecode contract](language.md#bytecode-and-virtual-machine) defines the scalar instructions and both commands.
+
+- [x] Represent functions, slots, constants, and positioned instructions in owned bytecode.
+- [x] Compile the scalar AST and print its instructions with `--bytecode`.
+- [x] Execute the instructions on a stack VM with explicit call frames.
+- [x] Compare both commands with C++ and compare the two Rust execution engines.
+
+### Learning note
+
+The [compiler](../src/bytecode_compiler.rs) uses each name's node identifier to obtain its resolved symbol.
+The symbol selects a local slot or function index. Reserving one slot per declaration costs memory in each active frame.
+This layout avoids name lookup during execution and preserves bindings when two nodes share a source position.
+A declaration emits `RESET_LOCAL` before its initializer, so a later loop iteration cannot read the previous iteration's value.
+
+The [VM](../src/vm.rs) keeps a vector of frames and a separate stack for temporary values.
+Each frame borrows its compiled function and owns its local slots. Its instruction index identifies where execution resumes.
+For `1 + f(n)`, the caller leaves `1` below the callee's stack base.
+The return restores the caller's frame and pushes the result beside `1`. The pending addition can then consume both operands.
+A void call contributes no stack value.
+
+### Validation
+
+All 78 Rust tests passed in both debug and release builds.
+Both builds matched the C++ listings, execution output, diagnostics, and exit status on all 15 scalar reference examples.
+Both builds passed 17 reference listing cases and 32 reference VM command cases.
+The VM matched the C++ engines on 405 integer arithmetic cases, including overflow and zero divisors.
+
+The [VM tests](../tests/vm.rs) compare the VM with the interpreter on ten programs at 80 step limits and three call depths.
+All 2,400 combinations agree on the value or the exact runtime error and position.
+With a configured limit of 6,000 calls, the VM returned through 5,002 active frames and completed the pending additions.
+
 ## Execution contracts for later phases
 
-The bytecode compiler and VM must preserve scalar values, evaluation order, and positioned errors.
+Local optimizations must preserve scalar values, evaluation order, source steps, and positioned errors.
 Each phase needs its own contract and approval before implementation.
