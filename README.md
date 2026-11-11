@@ -2,7 +2,8 @@
 
 This project implements Mini-C in Rust as a compiler study. The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides the language rules and reference programs.
 The lexer separates source bytes into 35 kinds of tokens, including keywords, identifiers, operators, and the end of input.
-The parser builds an abstract syntax tree (AST) for scalar programs. The [roadmap](docs/roadmap.md) tracks the interpreter, bytecode compiler, and virtual machine.
+The parser builds an abstract syntax tree (AST) for scalar programs. Semantic analysis connects names to declarations and checks types.
+The [roadmap](docs/roadmap.md) tracks the interpreter, bytecode compiler, and virtual machine.
 
 ## Inspect a program
 
@@ -54,12 +55,44 @@ Each child appears below its parent. The positions refer to the original source.
 Use [expressions.mc](examples/expressions.mc) to inspect precedence. Use [control_flow.mc](examples/control_flow.mc) to see which conditional owns an `else`.
 The [scalar grammar](docs/language.md#scalar-syntax) defines valid syntax. Array syntax belongs to phase 7.
 
+### Inspect names and types
+
+From the repository root, print the bindings in [scopes.mc](examples/scopes.mc).
+
+```sh
+cargo run --quiet -- --resolve examples/scopes.mc
+```
+
+The output includes these two reads of `value`.
+
+```text
+  Read "value" scope=#2 @7:13 -> Symbol #4 @6:9
+  Read "value" scope=#1 @9:10 -> Symbol #2 @3:7
+```
+
+Line 7 uses the declaration inside the nested block. Line 9 uses the outer declaration after the block ends.
+The source position on the left identifies the use. The position on the right identifies the declaration.
+
+Use `--check` to test a program against the [scalar type rules](docs/language.md#scalar-type-analysis).
+
+```sh
+cargo run --quiet -- --check examples/types.mc
+cargo run --quiet -- --check examples/type_error.mc
+```
+
+The first command exits with status 0 and prints nothing. The second exits with status 1 and writes this diagnostic to standard error.
+
+```text
+examples/type_error.mc:3:16: error: Expected type bool. Received int.
+```
+
 ## Library and command
 
 The [lexer](src/lexer.rs) borrows the source bytes. Each [token](src/token.rs) owns its text, so callers can keep tokens after they release the source.
 The library returns either the complete token list or a positioned error.
 The [parser](src/parser.rs) borrows the tokens and returns an owned tree or a positioned syntax error.
-The [command](src/main.rs) reads the complete input before it prints tokens or the tree. It adds the file path to each diagnostic.
+The [resolver](src/resolver.rs) records a symbol for each read, write, and call. The [type checker](src/type_checker.rs) uses those symbols to check expressions and returns.
+The [command](src/main.rs) prints the result of the selected stage or adds the file path to its first diagnostic.
 
 ## Tests
 
@@ -69,5 +102,5 @@ From the repository root, run the local tests.
 cargo test
 ```
 
-The tests use the Rust standard library. Command tests compare token lists and scalar trees with expected output from the C++ implementation.
+The tests use the Rust standard library. Command tests compare tokens, trees, name bindings, and diagnostics with the C++ implementation.
 The [lexical contract](docs/language.md) specifies the supported tokens, positions, and diagnostics.

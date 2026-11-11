@@ -9,7 +9,7 @@ Both paths must agree on results, errors, and source positions.
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
 | 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Complete |
-| 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | In progress |
+| 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Complete |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Pending |
@@ -101,7 +101,29 @@ The [name rules](language.md#scalar-name-resolution) and [type rules](language.m
 - [x] Record visibility, types, diagnostic order, and return guarantees.
 - [x] Resolve names and print scopes, declarations, and uses.
 - [x] Check function signatures, expression types, statements, and return paths.
-- [ ] Compare both commands with C++ and record the study results.
+- [x] Compare both commands with C++ and record the study results.
+
+### Learning note
+
+A binding links one name use to one declaration. The [resolver](../src/resolver.rs) borrows names from the tree while it builds each scope's lookup table.
+Its result owns the declaration names. Each `SymbolId` indexes a vector in declaration order, so two variables with the same spelling can have different identifiers.
+Copying each declaration name costs storage. It lets the result outlive the source tree.
+The resolver visits scopes, symbols, and uses in a fixed order for printing. Hash table iteration does not determine the output order.
+
+The [type checker](../src/type_checker.rs) uses the binding at each name position to find its declared type.
+The result stores expression types by source position. These positions refer to token starts in one program from the parser.
+Each result owns its symbol table and type information. Symbol identifiers and positions belong to that analysis.
+For `int x = x;`, the initializer reads the new integer variable. Execution will determine whether the variable has a value.
+
+Return analysis works on statement structure. In `if (ok) return 1; else return 2;`, both branches guarantee a return.
+A loop can execute zero times. The checker gives loops no return guarantee, even if a condition contains the literal `true`.
+It also checks statements after a return, so an invalid initializer still produces a diagnostic.
+
+### Validation
+
+Both commands matched C++ on all 15 scalar examples, including standard output, standard error, and exit status.
+Name resolution accepted 14 programs. Type analysis accepted 13.
+The comparison also covered 24 name errors, 35 type and return-path errors, and 123 combinations of operators and operand types.
 
 ## Execution contracts for later phases
 
