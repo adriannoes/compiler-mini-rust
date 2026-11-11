@@ -61,7 +61,7 @@ Unterminated block comment.
 
 The lexer quotes printable ASCII and escapes quotes and backslashes. It prints other unexpected bytes as two uppercase hexadecimal digits.
 Invalid arguments and file errors also produce a diagnostic on standard error and exit with status 1.
-On Unix, all four commands copy the original path bytes into file and source diagnostics. A path can contain bytes outside UTF-8.
+On Unix, the commands copy the original path bytes into file and source diagnostics. A path can contain bytes outside UTF-8.
 
 ## Scalar syntax
 
@@ -183,7 +183,7 @@ Execution handles initialization, literal range, and arithmetic errors. For exam
 ## Scalar execution
 
 The `--run <file>` command checks the entire program before it selects the entry function.
-The command calls `main` without arguments. The library also accepts another entry name.
+The command calls `main` without arguments. The library also accepts another entry name. Every entry must have zero parameters.
 An integer result prints in decimal. A boolean result prints as `true` or `false`.
 Each result line ends with a newline. A void result leaves standard output empty.
 Success returns status 0, including when the entry returns a nonzero integer.
@@ -227,7 +227,11 @@ A scalar assignment charges its expression and its right operand. The target nam
 Both the unary minus and its literal consume a step. Skipped nodes consume no steps.
 All calls share the step budget. Arguments finish before the call depth check.
 The library checks that both limits exceed zero before it analyzes the program.
+An invalid limit returns `InterpretError::InvalidLimits` without a source position.
+The interpreter walks the AST on the native Rust stack. Deep syntax or a large custom call depth can exhaust that stack.
 
+If opening the input fails, the command reports `path: error: Cannot open file.`.
+If reading the open input fails, the command reports `path: error: Cannot read file.`.
 The command reports the first source error as `path:line:column: error: message` on standard error.
 
 | Failure | Source position | Message |

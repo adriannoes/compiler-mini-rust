@@ -10,7 +10,7 @@ Both paths must agree on results, errors, and source positions.
 | 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Complete |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Complete |
-| 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
+| 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Complete |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Pending |
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Pending |
@@ -118,7 +118,7 @@ The analysis owns these tables. Callers can keep identifiers and query the resul
 A second index supports queries by position. Both `binding_at` and `type_at` return `None` if multiple entries share that position.
 Tree equality compares syntax and positions. Parsing the same input twice produces equal trees with distinct node identifiers.
 
-For `int x = x;`, the initializer reads the new integer variable. Execution will determine whether the variable has a value.
+For `int x = x;`, the initializer reads the new integer variable. Execution determines whether the variable has a value.
 
 Return analysis works on statement structure. In `if (ok) return 1; else return 2;`, both branches guarantee a return.
 A loop can execute zero times. The checker gives loops no return guarantee, even if a condition contains the literal `true`.
@@ -137,9 +137,49 @@ Git checks out the expected token, tree, and resolution files with LF endings. T
 On Unix, the [command tests](../tests/cli.rs) distinguish two missing paths that contain different invalid UTF-8 bytes.
 All 47 tests passed in debug and release builds. They also passed in a fresh checkout with `core.autocrlf=true`.
 
+## Phase 5
+
+The [execution contract](language.md#scalar-execution) defines the scalar interpreter and the `--run` command.
+
+- [x] Implement owned values and checked 64-bit integer operations.
+- [x] Execute an entry function, assignments, lexical blocks, and returns.
+- [x] Execute branches, loops, and recursive calls with step and call depth limits.
+- [x] Compare the command with C++ and test the arithmetic in debug and release builds.
+
+### Learning note
+
+A `NodeId` identifies one syntax node. A `SymbolId` identifies the declaration that the resolver selected.
+A frame holds the value of that declaration for one call. Recursive calls reuse the symbol but have separate storage.
+The [resolver](../src/resolver.rs) indexes each declaration by the node for its name.
+Reads and calls use the expression node. Writes use the assignment target node.
+The [interpreter tests](../tests/interpreter.rs) execute joined trees with different symbols at identical source positions.
+
+Each frame owns a stack of environments. Each explicit block adds a map and removes it on exit.
+The extra map stores the local variables for that block. A loop starts with fresh slots each time it enters the block.
+Each slot holds an `Option<Value>`. A read of `None` reports the uninitialized variable at its use.
+Arguments finish before the new frame receives their values. A returned scalar can outlive the frame and the borrowed tree.
+
+Statements return `ControlFlow<Value>` inside a `Result`.
+A bare return produces `Break(Value::Void)`. An empty statement produces `Continue(())`.
+The enclosing block or loop propagates a return immediately. An error carries the position where execution failed.
+A shared step budget charges each executed node. The remaining call depth belongs to the active frame.
+
+### Validation
+
+All 67 Rust tests passed in both debug and release builds.
+Both builds matched the C++ interpreter on all 15 scalar reference files.
+Ten succeeded and five produced diagnostics. The comparison checked stdout bytes, stderr bytes, and exit status.
+Both Rust builds also passed all 32 scalar `--run` cases from the C++ command tests.
+
+The arithmetic comparison used nine operands near zero and the signed limits on each side of five binary operators.
+All 405 cases matched. Of these, 310 returned values and 95 reported errors.
+Eleven more cases covered literal range, leading zeroes, evaluation order, and short circuits.
+The [runtime tests](../src/runtime.rs) check operator positions and distinguish a zero divisor from signed overflow.
+
+The file comparison used regular files. On the validation host, Rust reported `Cannot read file.` for a directory.
+The C++ executable treated the same directory as an empty program.
+
 ## Execution contracts for later phases
 
-The interpreter and VM will use signed 64-bit integers and report overflow and zero divisors at the operator.
-Operands will evaluate from left to right. Logical operators will skip the right operand when the left operand determines the result.
-Tests will compare values and positioned errors in debug and release builds.
+The bytecode compiler and VM must preserve scalar values, evaluation order, and positioned errors.
 Each phase needs its own contract and approval before implementation.

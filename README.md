@@ -3,7 +3,31 @@
 This project implements Mini-C in Rust as a compiler study. The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides the language rules and reference programs.
 The lexer separates source bytes into 35 kinds of tokens, including keywords, identifiers, operators, and the end of input.
 The parser builds an abstract syntax tree (AST) for scalar programs. Semantic analysis connects names to declarations and checks types.
-The [roadmap](docs/roadmap.md) tracks the interpreter, bytecode compiler, and virtual machine.
+The interpreter executes the scalar AST. The [roadmap](docs/roadmap.md) records the completed phases and the plans for bytecode and a virtual machine.
+
+## Run a program
+
+From the repository root, run the recursive [factorial example](examples/factorial.mc).
+
+```sh
+cargo run --quiet -- --run examples/factorial.mc
+```
+
+The command calls `main`, prints `720`, and exits with status 0. A boolean result prints as `true` or `false`.
+A `void` entry produces no output. The [execution rules](docs/language.md#scalar-execution) define the entry, arithmetic, and resource limits.
+
+To compare static analysis with execution, run the same source through both commands.
+
+```sh
+cargo run --quiet -- --check examples/runtime_error.mc
+cargo run --quiet -- --run examples/runtime_error.mc
+```
+
+The first command succeeds. The second exits with status 1 and writes this diagnostic to standard error.
+
+```text
+examples/runtime_error.mc:3:15: error: The variable "value" has no value.
+```
 
 ## Inspect a program
 
@@ -29,7 +53,7 @@ The command lists the tokens in the [example](examples/return_42.mc).
 ```
 
 The number `42` starts at line 2, byte column 10. The final newline places the end of input at line 4, column 1.
-The lexer preserves the digits as text. The interpreter will convert those digits when it evaluates the literal.
+The lexer preserves the digits as text. The interpreter converts those digits when it evaluates the literal.
 
 The [lexer example](examples/lexer.mc) contains comparisons, logical operators, and a negative integer written as two tokens.
 The [array example](examples/arrays.mc) also uses brackets. Pass either file to `--tokens` to inspect the boundaries and positions.
@@ -92,6 +116,8 @@ The [lexer](src/lexer.rs) borrows the source bytes. Each [token](src/token.rs) o
 The library returns either the complete token list or a positioned error.
 The [parser](src/parser.rs) borrows the tokens and returns an owned tree or a positioned syntax error.
 The [resolver](src/resolver.rs) records a symbol for each read, write, and call. The [type checker](src/type_checker.rs) uses those symbols to check expressions and returns.
+Call `interpret(&program, "main")` to execute the tree. Use `interpret_with_limits` to specify a step budget and a call depth limit.
+The [interpreter](src/interpreter.rs) returns an owned `Value` or an `InterpretError`.
 The [command](src/main.rs) prints the result of the selected stage or adds the file path to its first diagnostic.
 
 ## Tests
@@ -102,5 +128,5 @@ From the repository root, run the local tests.
 cargo test
 ```
 
-The tests use the Rust standard library. Command tests compare tokens, trees, name bindings, and diagnostics with the C++ implementation.
+The tests use the Rust standard library. Command tests check tokens, trees, name bindings, execution results, and diagnostics against expectations from C++.
 The [lexical contract](docs/language.md) specifies the supported tokens, positions, and diagnostics.
