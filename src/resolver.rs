@@ -72,6 +72,7 @@ pub struct Resolution {
     symbols: Vec<Symbol>,
     bindings: Vec<Binding>,
     uses: NodeMap<usize>,
+    declarations: HashMap<NodeId, SymbolId>,
 }
 
 impl Resolution {
@@ -85,6 +86,10 @@ impl Resolution {
 
     pub fn binding_at(&self, position: Position) -> Option<&Binding> {
         self.uses.at(position).map(|&index| &self.bindings[index])
+    }
+
+    pub fn declaration(&self, id: NodeId) -> Option<SymbolId> {
+        self.declarations.get(&id).copied()
     }
 
     pub fn symbol(&self, id: SymbolId) -> Option<&Symbol> {
@@ -147,6 +152,7 @@ pub fn resolve_names(program: &Program) -> Result<Resolution, AnalysisError> {
             symbols: Vec::new(),
             bindings: Vec::new(),
             uses: NodeMap::new(),
+            declarations: HashMap::new(),
         },
         names: vec![HashMap::new()],
     };
@@ -195,6 +201,7 @@ impl<'p> Resolver<'p> {
             });
         }
         self.names[scope].insert(&name.text, id);
+        self.result.declarations.insert(name.id(), id);
         self.result.symbols.push(Symbol {
             name: name.text.clone(),
             kind,

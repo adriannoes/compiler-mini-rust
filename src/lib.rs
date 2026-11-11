@@ -1,4 +1,5 @@
 pub mod ast;
+mod interpreter;
 mod lexer;
 mod parser;
 pub mod resolver;
@@ -6,6 +7,7 @@ mod runtime;
 mod token;
 mod type_checker;
 
+pub use interpreter::{InterpretError, interpret};
 pub use lexer::{LexError, LexErrorKind, lex};
 pub use parser::{ParseError, parse};
 pub use resolver::{AnalysisError, Resolution, resolve_names};
