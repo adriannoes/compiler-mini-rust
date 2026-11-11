@@ -110,6 +110,62 @@ fn static_checks_accept_unevaluated_arithmetic_and_uninitialized_reads() {
     }
 }
 
+fn assert_operator_type(expression: &str, expected: Option<Type>) {
+    let source = format!("void v() {{}} void f() {{ {expression}; }}");
+    let program = parse(&lex(source.as_bytes()).unwrap()).unwrap();
+    let [Stmt::Expression { value, .. }] = program.functions[1].body.statements.as_slice() else {
+        panic!("Expected one expression statement.");
+    };
+    let result = check_types(&program);
+    match expected {
+        Some(ty) => {
+            let analysis = result.unwrap_or_else(|e| panic!("{expression}: {e}"));
+            assert_eq!(analysis.type_of(value.id()), Some(ty), "{expression}");
+        }
+        None => assert_eq!(result.unwrap_err().position, value.position, "{expression}"),
+    }
+}
+
+#[test]
+fn each_operator_accepts_its_operand_types_and_records_its_result_type() {
+    use Type::{Bool, Int, Void};
+    let operands = [("1", Int), ("true", Bool), ("v()", Void)];
+    for (operator, on_ints, on_bools) in [
+        ("+", Some(Int), None),
+        ("-", Some(Int), None),
+        ("*", Some(Int), None),
+        ("/", Some(Int), None),
+        ("%", Some(Int), None),
+        ("<", Some(Bool), None),
+        ("<=", Some(Bool), None),
+        (">", Some(Bool), None),
+        (">=", Some(Bool), None),
+        ("==", Some(Bool), Some(Bool)),
+        ("!=", Some(Bool), Some(Bool)),
+        ("&&", None, Some(Bool)),
+        ("||", None, Some(Bool)),
+    ] {
+        for (lhs, left) in operands {
+            for (rhs, right) in operands {
+                let expected = match (left, right) {
+                    (Int, Int) => on_ints,
+                    (Bool, Bool) => on_bools,
+                    _ => None,
+                };
+                assert_operator_type(&format!("{lhs} {operator} {rhs}"), expected);
+            }
+        }
+    }
+    for (operator, required) in [("-", Int), ("!", Bool)] {
+        for (value, ty) in operands {
+            assert_operator_type(
+                &format!("{operator}{value}"),
+                (ty == required).then_some(ty),
+            );
+        }
+    }
+}
+
 #[test]
 fn operators_require_matching_scalar_types() {
     let sources = [
