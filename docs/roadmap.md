@@ -130,6 +130,13 @@ Both commands matched C++ on all 15 scalar examples, including standard output, 
 Name resolution accepted 14 programs. Type analysis accepted 13.
 The comparison also covered 24 name errors, 35 type and return-path errors, and 123 combinations of operators and operand types.
 
+The [type tests](../tests/type_checker.rs) cover all 123 operator cases. They check the result type for each valid expression and the operator position for each error.
+They also join two functions from separate parser calls. The functions use the same positions for reads, writes, and calls.
+
+Git checks out the expected token, tree, and resolution files with LF endings. This preserves the exact output bytes when Git converts source files to CRLF.
+On Unix, the [command tests](../tests/cli.rs) distinguish two missing paths that contain different invalid UTF-8 bytes.
+All 47 tests passed in debug and release builds. They also passed in a fresh checkout with `core.autocrlf=true`.
+
 ## Execution contracts for later phases
 
 The interpreter and VM will use signed 64-bit integers and report overflow and zero divisors at the operator.
