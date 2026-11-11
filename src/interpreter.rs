@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::ControlFlow;
 
-use crate::ast::{Block, Expr, ExprKind, Name, NodeId, Program, Stmt};
-use crate::resolver::SymbolId;
+use crate::ast::{Block, Expr, ExprKind, Function, Name, NodeId, Program, Stmt};
+use crate::resolver::{SymbolId, SymbolKind};
 use crate::runtime::{self, RuntimeError, Value};
 use crate::{AnalysisError, Position, Resolution, TokenKind, check_types};
 
@@ -89,32 +89,27 @@ pub fn interpret_with_limits(
         )));
     }
     let mut interpreter = Interpreter {
+        program,
         resolution: analysis.resolution,
         steps_left: limits.max_steps,
     };
     interpreter
-        .step(function.body.position)
-        .map_err(InterpretError::Runtime)?;
-    let mut frame = Frame::new();
-    match interpreter
-        .block_contents(&mut frame, &function.body)
-        .map_err(InterpretError::Runtime)?
-    {
-        ControlFlow::Break(value) => Ok(value),
-        ControlFlow::Continue(()) => Ok(Value::Void),
-    }
+        .invoke(function, &[], function.name.position, limits.max_call_depth)
+        .map_err(InterpretError::Runtime)
 }
 
 type Environment = HashMap<SymbolId, Option<Value>>;
 type Flow = ControlFlow<Value>;
 
 struct Frame {
+    calls_left: usize,
     scopes: Vec<Environment>,
 }
 
 impl Frame {
-    fn new() -> Self {
+    fn new(calls_left: usize) -> Self {
         Self {
+            calls_left,
             scopes: vec![Environment::new()],
         }
     }
@@ -135,12 +130,34 @@ impl Frame {
     }
 }
 
-struct Interpreter {
+struct Interpreter<'p> {
+    program: &'p Program,
     resolution: Resolution,
     steps_left: usize,
 }
 
-impl Interpreter {
+impl Interpreter<'_> {
+    fn invoke(
+        &mut self,
+        function: &Function,
+        arguments: &[Value],
+        call_site: Position,
+        calls_left: usize,
+    ) -> Result<Value, RuntimeError> {
+        let calls_left = calls_left
+            .checked_sub(1)
+            .ok_or_else(|| RuntimeError::new(call_site, "The call depth limit was reached."))?;
+        let mut frame = Frame::new(calls_left);
+        for (parameter, &value) in function.parameters.iter().zip(arguments) {
+            frame.declare(self.declaration(&parameter.name), Some(value));
+        }
+        self.step(function.body.position)?;
+        match self.block_contents(&mut frame, &function.body)? {
+            ControlFlow::Break(value) => Ok(value),
+            ControlFlow::Continue(()) => Ok(Value::Void),
+        }
+    }
+
     fn step(&mut self, position: Position) -> Result<(), RuntimeError> {
         self.steps_left = self
             .steps_left
@@ -262,10 +279,25 @@ impl Interpreter {
                 let right = self.expression(frame, right)?;
                 runtime::binary(*op, left, right, position)
             }
-            ExprKind::Call { .. } => Err(RuntimeError::new(
-                position,
-                "Function calls require a call frame.",
-            )),
+            ExprKind::Call { arguments, .. } => {
+                let symbol = self
+                    .resolution
+                    .symbol(self.binding(expr.id()))
+                    .expect("Each call has a symbol.");
+                let SymbolKind::Function(index) = symbol.kind else {
+                    unreachable!("Name resolution selects a function for each call.");
+                };
+                let mut values = Vec::with_capacity(arguments.len());
+                for argument in arguments {
+                    values.push(self.expression(frame, argument)?);
+                }
+                self.invoke(
+                    &self.program.functions[index],
+                    &values,
+                    position,
+                    frame.calls_left,
+                )
+            }
         }
     }
 }

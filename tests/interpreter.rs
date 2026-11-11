@@ -230,6 +230,117 @@ fn branches_and_loops_run_only_the_selected_body() {
 }
 
 #[test]
+fn calls_copy_parameters_and_evaluate_arguments_in_the_caller() {
+    let pair = "int main() { int x = 0; int r = pair(x = x + 1, x = x + 1); return r * 10 + x; }
+                int pair(int a, int b) { int r = a * 10 + b; a = 9; return r; }";
+    assert_eq!(run(pair), Ok(Value::Int(122)));
+    assert_eq!(
+        run(
+            "bool flip(bool b) { b = !b; return b; } bool main() { bool b = false; return flip(b) && !b; }"
+        ),
+        Ok(Value::Bool(true))
+    );
+    assert_eq!(
+        run(
+            "void set(int x) { while (true) { x = 99; return; } } int main() { int x = 1; set(x); return x; }"
+        ),
+        Ok(Value::Int(1))
+    );
+    runtime_error(
+        "int divide(int n) {\n  return 1 / n; } int main() { return divide(0); }",
+        2,
+        12,
+        "The divisor is zero.",
+    );
+}
+
+#[test]
+fn recursive_calls_isolate_locals_and_can_call_later_functions() {
+    assert_eq!(run(include_str!("../examples/calls.mc")), Ok(Value::Int(6)));
+    assert_eq!(
+        run(include_str!("../examples/factorial.mc")),
+        Ok(Value::Int(720))
+    );
+    assert_eq!(
+        run(include_str!("../examples/fibonacci.mc")),
+        Ok(Value::Int(55))
+    );
+    let mutual = concat!(
+        include_str!("../examples/recursion.mc"),
+        "\nbool main() { return even(10) && odd(9); }"
+    );
+    assert_eq!(run(mutual), Ok(Value::Bool(true)));
+    let sum = "int sum(int n) { int x = 10 * n; if (n == 0) return 0; int child = sum(n - 1); return x + n + child; }
+               int main() { return sum(3); }";
+    assert_eq!(run(sum), Ok(Value::Int(66)));
+    runtime_error(
+        "int f(int n) { int x; if (n == 0) {\n  return x; } x = n; return f(n - 1); } int main() { return f(1); }",
+        2,
+        10,
+        "The variable \"x\" has no value.",
+    );
+}
+
+#[test]
+fn joined_trees_execute_distinct_declarations_and_uses_at_shared_positions() {
+    let mut tree = program("int f(int x) { int z = x; z = p(z); return z; }");
+    tree.functions
+        .extend(program("int g(int y) { int w = y; w = q(w); return w; }").functions);
+    tree.functions.extend(program("int p(int n) { return n + 1; } int q(int n) { return n * 2; } int main() { return f(3) * 10 + g(5); }").functions);
+    assert_eq!(interpret(&tree, "main"), Ok(Value::Int(50)));
+}
+
+#[test]
+fn active_calls_share_steps_and_restore_depth_after_each_return() {
+    let nested = "int id(int n) { return n; } int main() { return id(id(id(3))); }";
+    assert_eq!(limited(nested, 100, 2), Ok(Value::Int(3)));
+    for (src, steps, depth, line, column, message) in [
+        (
+            "int f() {\n  return f(); } int main() { return f(); }",
+            1000,
+            3,
+            2,
+            10,
+            "The call depth limit was reached.",
+        ),
+        (
+            "void f() {} void main() { f(); f(); }",
+            6,
+            2,
+            1,
+            10,
+            "The execution step limit was reached.",
+        ),
+        (
+            "int f(int a) { return a; } int main() { int x;\n  return f(x); }",
+            100,
+            1,
+            2,
+            12,
+            "The variable \"x\" has no value.",
+        ),
+    ] {
+        let error = limited(src, steps, depth).unwrap_err();
+        assert_eq!(error.to_string(), message);
+        assert_eq!(error.position(), Some(Position { line, column }));
+    }
+    runtime_error(
+        "int f() {\n  return f(); } int main() { return f(); }",
+        2,
+        10,
+        "The call depth limit was reached.",
+    );
+    assert_eq!(
+        limited(
+            "bool f() { return f(); } bool main() { return false && f(); }",
+            4,
+            1
+        ),
+        Ok(Value::Bool(false))
+    );
+}
+
+#[test]
 fn repeated_execution_owns_its_result_and_preserves_the_tree() {
     let answer = {
         let tree = program("int main() { int x = 41; return x = x + 1; }");
