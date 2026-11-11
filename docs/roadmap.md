@@ -9,7 +9,7 @@ Both paths must agree on results, errors, and source positions.
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
 | 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
 | 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Complete |
-| 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Pending |
+| 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | In progress |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Pending |
@@ -93,6 +93,15 @@ Scalar assignment stores a name and its position directly. This representation e
 The parser returns the first positioned `ParseError`. The [printer](../src/ast/display.rs) receives a complete tree.
 
 The [parsing exercises](parsing.md) compare top-down decisions with a bottom-up trace for the same expression.
+
+## Phase 4
+
+The [name rules](language.md#scalar-name-resolution) and [type rules](language.md#scalar-type-analysis) define the scalar analysis commands.
+
+- [x] Record visibility, types, diagnostic order, and return guarantees.
+- [ ] Resolve names and print scopes, declarations, and uses.
+- [ ] Check function signatures, expression types, statements, and return paths.
+- [ ] Compare both commands with C++ and record the study results.
 
 ## Execution contracts for later phases
 

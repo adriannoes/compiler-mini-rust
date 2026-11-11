@@ -121,3 +121,60 @@ Each tree level adds two spaces. Each positioned node ends with `@line:column`.
 Success writes the complete tree to standard output and exits with status 0.
 The first lexical or syntax error writes a diagnostic to standard error and exits with status 1. Standard output stays empty.
 A syntax diagnostic identifies the unexpected token or the invalid assignment operator. An incomplete program can report the position of `EOF`.
+
+## Scalar name resolution
+
+Use `--resolve <file>` to see which declaration each name refers to.
+A scope contains declarations that are visible in part of a program. The global scope contains every function.
+The resolver registers all functions before it visits any body. This order permits forward calls and mutual recursion.
+
+A function's parameters and outer body share one scope. Each nested block opens a child scope.
+An unbraced branch or loop body uses the current scope.
+Names are case sensitive. Functions, parameters, and variables share a namespace.
+A repeated declaration in one scope produces an error at the second name.
+
+A use selects the nearest visible declaration. An inner declaration can hide an outer declaration, including a function.
+A local name becomes visible before its initializer. In `int x = x;`, the initializer refers to the new variable.
+Reads and assignments require variables or parameters. A call requires a function.
+A hidden function stays inaccessible through that name, even in a call.
+
+The resolver visits functions and statements in source order. It binds an assignment target before its value and a callee before its arguments.
+It visits both conditional branches, loop bodies, and statements after returns.
+On success, the command prints scopes, symbols, and bindings in creation order and exits with status 0.
+Each binding identifies the use, its scope, and its declaration. An error reports the first invalid name and its source position.
+
+## Scalar type analysis
+
+Use `--check <file>` to check a program. The checker resolves all names before it checks any types.
+It checks every function signature before it visits function bodies.
+Parameters and variables accept `int` or `bool`. A function can also return `void`.
+
+| Construct | Required type | Result |
+|-----------|---------------|--------|
+| Decimal literal | Decimal digits of any length | int |
+| Unary minus and arithmetic | int operands | int |
+| Ordering comparisons | int operands | bool |
+| Negation and logical operators | bool operands | bool |
+| Equality and inequality | Both int or both bool | bool |
+| Initialization and assignment | Value matches the declared type | Assignment yields that type |
+| Function call | Arguments match parameter count, order, and types | Declared return type |
+| Condition | bool | Selects a branch or controls a loop during execution |
+
+A standalone expression can discard any result, including `void`. No implicit conversion occurs between integer and boolean values.
+The checker visits both operands before it checks a binary operator. It visits the left operand first.
+A call checks the argument count before it checks each argument in source order.
+The checker examines all statements, including unreachable statements.
+
+A `void` function accepts a bare return and can reach the end of its body.
+A non-void function must return a value of its declared type on every path under the following structural rules.
+
+- A return guarantees a return from its path.
+- A block guarantees a return if one of its statements guarantees a return.
+- An `if` guarantees a return if it has an `else` and both branches guarantee a return.
+- A `while` never guarantees a return, even if its condition is `true`.
+
+A missing return guarantee points to the function name. A return with a missing, extra, or incompatible value points to the return keyword.
+Argument count errors point to the callee. Argument type errors point to the argument expression.
+A successful check exits with status 0 and prints nothing. Both analysis commands report the first error on standard error and exit with status 1.
+Standard output stays empty on failure. Neither command requires `main`.
+Execution handles initialization, literal range, and arithmetic errors. For example, `int f() { return 1 / 0; }` passes static analysis.
