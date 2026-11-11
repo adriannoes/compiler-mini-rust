@@ -143,6 +143,69 @@ fn incomplete_and_invalid_expressions_report_the_first_error() {
 }
 
 #[test]
+fn calls_and_declarations_accept_syntactically_valid_types_and_names() {
+    let tree = program("void g(void x) { void y = unknown(x, noargs(), true + 1); }");
+    let function = &tree.functions[0];
+    assert_eq!(function.parameters[0].name.text, "x");
+    assert_eq!(function.parameters[0].ty.keyword, TokenKind::Void);
+    let Stmt::Variable {
+        name,
+        ty,
+        initializer: Some(value),
+    } = &function.body.statements[0]
+    else {
+        panic!("Expected a variable with an initializer.")
+    };
+    assert_eq!(name.text, "y");
+    assert_eq!(ty.keyword, TokenKind::Void);
+    let ExprKind::Call { name, arguments } = &value.kind else {
+        panic!("Expected a call.")
+    };
+    assert_eq!(name, "unknown");
+    assert_eq!(arguments.len(), 3);
+    assert!(matches!(&arguments[1].kind, ExprKind::Call { arguments, .. } if arguments.is_empty()));
+}
+
+#[test]
+fn lists_and_declarations_report_the_offending_token() {
+    for (source, message) in [
+        (
+            "void f(void\n) {}",
+            "Expected a parameter name. Received RIGHT_PAREN.",
+        ),
+        (
+            "int f(int x,\n) {}",
+            "Expected a type. Received RIGHT_PAREN.",
+        ),
+        (
+            "int f() { f(1,\n); }",
+            "Expected an expression. Received RIGHT_PAREN.",
+        ),
+        (
+            "int f() { f(1\n2); }",
+            "Expected \")\" after arguments. Received INTEGER.",
+        ),
+        (
+            "int f() { (g)\n(); }",
+            "Expected \";\" after expression. Received LEFT_PAREN.",
+        ),
+        ("int f() { g()\n= 1; }", "Expected a name before \"=\"."),
+        (
+            "int f() { int x\n[1]; }",
+            "Expected \";\" after declaration. Received LEFT_BRACKET.",
+        ),
+        (
+            "int f() { return x\n[0]; }",
+            "Expected \";\" after return value. Received LEFT_BRACKET.",
+        ),
+    ] {
+        let error = parse(&lex(source.as_bytes()).unwrap()).unwrap_err();
+        assert_eq!(error.position, Position { line: 2, column: 1 }, "{source}");
+        assert_eq!(error.message, message, "{source}");
+    }
+}
+
+#[test]
 fn input_tokens_require_a_final_eof() {
     let tokens = lex(b"int").unwrap();
     for input in [&[][..], &tokens[..1]] {

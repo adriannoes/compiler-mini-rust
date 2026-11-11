@@ -1,0 +1,34 @@
+Program
+  Function "add" @2:5
+    Type INT @2:1
+    Parameter "left" @2:13
+      Type INT @2:9
+    Parameter "right" @2:23
+      Type INT @2:19
+    Block @2:30
+      Variable "total" @3:7
+        Type INT @3:3
+        Binary PLUS @3:20
+          Name "left" @3:15
+          Name "right" @3:22
+      Return @4:3
+        Name "total" @4:10
+  Function "main" @6:5
+    Type INT @6:1
+    Block @6:12
+      Variable "result" @7:7
+        Type INT @7:3
+      Expression @8:3
+        Assign @8:10
+          Name "result" @8:3
+          Call "add" @8:12
+            Integer "1" @8:16
+            Call "add" @8:19
+              Integer "2" @8:23
+              Integer "3" @8:26
+      Variable "ready" @9:8
+        Type BOOL @9:3
+        Boolean true @9:16
+      Empty @10:3
+      Return @11:3
+        Name "result" @11:10

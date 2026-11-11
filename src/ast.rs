@@ -23,7 +23,14 @@ pub struct TypeSyntax {
 pub struct Function {
     pub name: Name,
     pub return_type: TypeSyntax,
+    pub parameters: Vec<Parameter>,
     pub body: Block,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Parameter {
+    pub name: Name,
+    pub ty: TypeSyntax,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -35,6 +42,11 @@ pub struct Block {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Stmt {
     Block(Block),
+    Variable {
+        name: Name,
+        ty: TypeSyntax,
+        initializer: Option<Expr>,
+    },
     Return {
         position: Position,
         value: Option<Expr>,
@@ -57,6 +69,10 @@ pub enum ExprKind {
     Integer(String),
     Boolean(bool),
     Name(String),
+    Call {
+        name: String,
+        arguments: Vec<Expr>,
+    },
     Unary {
         op: TokenKind,
         operand: Box<Expr>,

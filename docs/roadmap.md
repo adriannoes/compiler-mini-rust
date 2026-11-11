@@ -66,7 +66,7 @@ The [scalar grammar](language.md#scalar-syntax) defines the input and output of 
 
 - [x] Record the grammar, positions, and error contract.
 - [x] Parse expressions, blocks, and functions without parameters. Print their trees.
-- [ ] Parse declarations, parameters, and named calls.
+- [x] Parse declarations, parameters, and named calls.
 - [ ] Parse conditionals and loops. Compare scalar trees and errors with C++.
 - [ ] Work through FIRST and FOLLOW sets and a shift/reduce example.
 

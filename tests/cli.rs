@@ -98,6 +98,10 @@ fn examples_match_cpp_syntax_trees() {
             "examples/expressions.mc",
             include_bytes!("fixtures/expressions.ast").as_slice(),
         ),
+        (
+            "examples/calls.mc",
+            include_bytes!("fixtures/calls.ast").as_slice(),
+        ),
     ] {
         let output = run(&["--ast", path]);
         assert_eq!(output.status.code(), Some(0), "{path}");

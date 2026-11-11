@@ -14,6 +14,14 @@ impl fmt::Display for Program {
                 function.name.position,
             )?;
             tree.ty(2, &function.return_type)?;
+            for parameter in &function.parameters {
+                tree.node(
+                    2,
+                    format_args!("Parameter \"{}\"", parameter.name.text),
+                    parameter.name.position,
+                )?;
+                tree.ty(3, &parameter.ty)?;
+            }
             tree.block(2, &function.body)?;
         }
         Ok(())
@@ -55,6 +63,22 @@ impl TreePrinter<'_, '_> {
     fn statement(&mut self, depth: usize, stmt: &Stmt) -> fmt::Result {
         match stmt {
             Stmt::Block(block) => self.block(depth, block),
+            Stmt::Variable {
+                name,
+                ty,
+                initializer,
+            } => {
+                self.node(
+                    depth,
+                    format_args!("Variable \"{}\"", name.text),
+                    name.position,
+                )?;
+                self.ty(depth + 1, ty)?;
+                if let Some(initializer) = initializer {
+                    self.expression(depth + 1, initializer)?;
+                }
+                Ok(())
+            }
             Stmt::Return { position, value } => {
                 self.node(depth, "Return", *position)?;
                 if let Some(value) = value {
@@ -78,6 +102,13 @@ impl TreePrinter<'_, '_> {
             }
             ExprKind::Boolean(value) => self.node(depth, format_args!("Boolean {value}"), pos),
             ExprKind::Name(name) => self.node(depth, format_args!("Name \"{name}\""), pos),
+            ExprKind::Call { name, arguments } => {
+                self.node(depth, format_args!("Call \"{name}\""), pos)?;
+                for argument in arguments {
+                    self.expression(depth + 1, argument)?;
+                }
+                Ok(())
+            }
             ExprKind::Unary { op, operand } => {
                 self.node(depth, format_args!("Unary {}", op.name()), pos)?;
                 self.expression(depth + 1, operand)

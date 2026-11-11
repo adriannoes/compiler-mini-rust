@@ -1,12 +1,21 @@
 use std::fmt;
 
-use crate::ast::{Block, Expr, ExprKind, Function, Name, Program, Stmt, TypeSyntax};
+use crate::ast::{Block, Expr, ExprKind, Function, Name, Parameter, Program, Stmt, TypeSyntax};
 use crate::{Position, Token, TokenKind};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseError {
     pub position: Position,
     pub message: String,
+}
+
+impl ParseError {
+    fn expected(token: &Token, message: &str) -> Self {
+        Self {
+            position: token.position,
+            message: format!("{message} Received {}.", token.kind.name()),
+        }
+    }
 }
 
 impl fmt::Display for ParseError {
@@ -60,24 +69,15 @@ impl<'t> Parser<'t> {
         (self.peek().kind == kind).then(|| self.advance())
     }
 
-    fn error(&self, message: &str) -> ParseError {
-        ParseError {
-            position: self.peek().position,
-            message: format!("{message} Received {}.", self.peek().kind.name()),
-        }
-    }
-
     fn expect(&mut self, kind: TokenKind, message: &str) -> Result<&'t Token, ParseError> {
-        self.take(kind).ok_or_else(|| self.error(message))
+        self.take(kind)
+            .ok_or_else(|| ParseError::expected(self.peek(), message))
     }
 
     fn ty(&mut self) -> Result<TypeSyntax, ParseError> {
         let token = self.peek();
-        if !matches!(
-            token.kind,
-            TokenKind::Int | TokenKind::Bool | TokenKind::Void
-        ) {
-            return Err(self.error("Expected a type."));
+        if !is_type(token.kind) {
+            return Err(ParseError::expected(token, "Expected a type."));
         }
         self.advance();
         Ok(TypeSyntax {
@@ -98,12 +98,36 @@ impl<'t> Parser<'t> {
         let return_type = self.ty()?;
         let name = self.name("Expected a function name.")?;
         self.expect(TokenKind::LeftParen, "Expected \"(\" after function name.")?;
+        let parameters = self.comma_list(Self::parameter)?;
         self.expect(TokenKind::RightParen, "Expected \")\" after parameters.")?;
         Ok(Function {
             name,
             return_type,
+            parameters,
             body: self.block()?,
         })
+    }
+
+    fn comma_list<T>(
+        &mut self,
+        item: fn(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<Vec<T>, ParseError> {
+        let mut items = Vec::new();
+        if self.peek().kind != TokenKind::RightParen {
+            loop {
+                items.push(item(self)?);
+                if self.take(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+        }
+        Ok(items)
+    }
+
+    fn parameter(&mut self) -> Result<Parameter, ParseError> {
+        let ty = self.ty()?;
+        let name = self.name("Expected a parameter name.")?;
+        Ok(Parameter { name, ty })
     }
 
     fn block(&mut self) -> Result<Block, ParseError> {
@@ -112,12 +136,33 @@ impl<'t> Parser<'t> {
             .position;
         let mut statements = Vec::new();
         while !matches!(self.peek().kind, TokenKind::RightBrace | TokenKind::Eof) {
-            statements.push(self.statement()?);
+            let stmt = if is_type(self.peek().kind) {
+                self.declaration()?
+            } else {
+                self.statement()?
+            };
+            statements.push(stmt);
         }
         self.expect(TokenKind::RightBrace, "Expected \"}\" after block.")?;
         Ok(Block {
             position,
             statements,
+        })
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        let ty = self.ty()?;
+        let name = self.name("Expected a variable name.")?;
+        let initializer = if self.take(TokenKind::Assign).is_some() {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::Semicolon, "Expected \";\" after declaration.")?;
+        Ok(Stmt::Variable {
+            name,
+            ty,
+            initializer,
         })
     }
 
@@ -204,25 +249,36 @@ impl<'t> Parser<'t> {
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
-        let token = self.peek();
+        let token = self.advance();
         let kind = match token.kind {
             TokenKind::Integer => ExprKind::Integer(token.text.clone()),
             TokenKind::True | TokenKind::False => ExprKind::Boolean(token.kind == TokenKind::True),
-            TokenKind::Identifier => ExprKind::Name(token.text.clone()),
+            TokenKind::Identifier => {
+                let name = token.text.clone();
+                if self.take(TokenKind::LeftParen).is_some() {
+                    let arguments = self.comma_list(Self::expression)?;
+                    self.expect(TokenKind::RightParen, "Expected \")\" after arguments.")?;
+                    ExprKind::Call { name, arguments }
+                } else {
+                    ExprKind::Name(name)
+                }
+            }
             TokenKind::LeftParen => {
-                self.advance();
                 let expr = self.expression()?;
                 self.expect(TokenKind::RightParen, "Expected \")\" after expression.")?;
                 return Ok(expr);
             }
-            _ => return Err(self.error("Expected an expression.")),
+            _ => return Err(ParseError::expected(token, "Expected an expression.")),
         };
-        self.advance();
         Ok(Expr {
             position: token.position,
             kind,
         })
     }
+}
+
+fn is_type(kind: TokenKind) -> bool {
+    matches!(kind, TokenKind::Int | TokenKind::Bool | TokenKind::Void)
 }
 
 fn binary_precedence(kind: TokenKind) -> Option<u8> {
