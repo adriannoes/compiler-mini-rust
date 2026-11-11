@@ -220,8 +220,8 @@ fn type_check_is_silent_on_success_and_reports_a_position_on_failure() {
 }
 
 #[test]
-fn semantic_commands_require_one_file_and_propagate_earlier_errors() {
-    for mode in ["--resolve", "--check"] {
+fn analysis_and_run_commands_require_one_file_and_propagate_earlier_errors() {
+    for mode in ["--resolve", "--check", "--run"] {
         for args in [&[mode][..], &[mode, "file", "extra"]] {
             let output = run(args);
             assert_eq!(output.status.code(), Some(1));
@@ -246,13 +246,60 @@ fn semantic_commands_require_one_file_and_propagate_earlier_errors() {
 }
 
 #[test]
-fn help_lists_analysis_commands() {
+fn run_prints_the_entry_value_and_exits_successfully() {
+    for (path, expected) in [
+        ("examples/return_42.mc", "42\n"),
+        ("examples/short_circuit.mc", "true\n"),
+        ("examples/calls.mc", "6\n"),
+        ("examples/factorial.mc", "720\n"),
+        ("examples/fibonacci.mc", "55\n"),
+        ("tests/fixtures/void_main.mc", ""),
+    ] {
+        let output = run(&["--run", path]);
+        assert_eq!(output.status.code(), Some(0), "{path}");
+        assert_eq!(output.stdout, expected.as_bytes(), "{path}");
+        assert!(output.stderr.is_empty(), "{path}");
+    }
+}
+
+#[test]
+fn run_reports_static_entry_and_runtime_errors_without_output() {
+    for (path, diagnostic) in [
+        (
+            "examples/control_flow.mc",
+            "1:1: error: The entry function \"main\" does not exist.",
+        ),
+        (
+            "examples/runtime_error.mc",
+            "3:15: error: The variable \"value\" has no value.",
+        ),
+        (
+            "examples/expressions.mc",
+            "9:10: error: Undeclared name \"left\".",
+        ),
+        (
+            "examples/type_error.mc",
+            "3:16: error: Expected type bool. Received int.",
+        ),
+    ] {
+        let output = run(&["--run", path]);
+        assert_eq!(output.status.code(), Some(1), "{path}");
+        assert!(output.stdout.is_empty(), "{path}");
+        assert_eq!(output.stderr, format!("{path}:{diagnostic}\n").as_bytes());
+    }
+    let check = run(&["--check", "examples/runtime_error.mc"]);
+    assert_eq!(check.status.code(), Some(0));
+    assert!(check.stdout.is_empty() && check.stderr.is_empty());
+}
+
+#[test]
+fn help_lists_available_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n"
         );
         assert!(output.stderr.is_empty());
     }

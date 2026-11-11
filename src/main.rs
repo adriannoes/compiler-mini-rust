@@ -7,9 +7,9 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use compiler_mini_rust::{Position, check_types, lex, parse, resolve_names};
+use compiler_mini_rust::{Position, Value, check_types, interpret, lex, parse, resolve_names};
 
-const MODES: &[&str] = &["--tokens", "--ast", "--resolve", "--check"];
+const MODES: &[&str] = &["--tokens", "--ast", "--resolve", "--check", "--run"];
 
 enum CliError {
     Message(String),
@@ -94,6 +94,13 @@ fn run() -> Result<(), CliError> {
     } else {
         let program = parse(&tokens).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;
         match mode {
+            "--run" => {
+                let value = interpret(&program, "main")
+                    .map_err(|error| diagnostic(error.position(), error.to_string()))?;
+                if value != Value::Void {
+                    writeln!(output, "{value}")?;
+                }
+            }
             "--check" => {
                 check_types(&program).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;
             }
