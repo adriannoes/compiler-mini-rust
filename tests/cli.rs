@@ -176,13 +176,63 @@ fn resolution_matches_cpp_and_reports_the_first_name_error() {
 }
 
 #[test]
+fn type_check_is_silent_on_success_and_reports_a_position_on_failure() {
+    for path in [
+        "examples/types.mc",
+        "examples/scopes.mc",
+        "examples/recursion.mc",
+    ] {
+        let output = run(&["--check", path]);
+        assert_eq!(output.status.code(), Some(0), "{path}");
+        assert!(output.stdout.is_empty() && output.stderr.is_empty());
+    }
+    let path = "examples/type_error.mc";
+    for mode in ["--tokens", "--ast", "--resolve"] {
+        assert_eq!(run(&[mode, path]).status.code(), Some(0));
+    }
+    let output = run(&["--check", path]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        output.stderr,
+        b"examples/type_error.mc:3:16: error: Expected type bool. Received int.\n"
+    );
+}
+
+#[test]
+fn semantic_commands_require_one_file_and_propagate_earlier_errors() {
+    for mode in ["--resolve", "--check"] {
+        for args in [&[mode][..], &[mode, "file", "extra"]] {
+            let output = run(args);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(output.stdout.is_empty());
+            assert_eq!(
+                output.stderr,
+                format!("minic: error: Expected {mode} <file>. Use --help for usage.\n").as_bytes()
+            );
+        }
+        for path in [
+            "tests/fixtures/missing.mc",
+            "tests/fixtures/syntax_error.mc",
+            "tests/fixtures/lex_before_syntax.mc",
+        ] {
+            let expected = run(&["--ast", path]);
+            let output = run(&[mode, path]);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(output.stdout.is_empty());
+            assert_eq!(output.stderr, expected.stderr);
+        }
+    }
+}
+
+#[test]
 fn help_lists_analysis_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n"
         );
         assert!(output.stderr.is_empty());
     }

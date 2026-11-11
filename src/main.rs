@@ -5,9 +5,9 @@ use std::io::{self, BufWriter, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use compiler_mini_rust::{Position, lex, parse, resolve_names};
+use compiler_mini_rust::{Position, check_types, lex, parse, resolve_names};
 
-const MODES: &[&str] = &["--tokens", "--ast", "--resolve"];
+const MODES: &[&str] = &["--tokens", "--ast", "--resolve", "--check"];
 
 fn run() -> Result<(), String> {
     let mut args = env::args_os().skip(1);
@@ -54,11 +54,15 @@ fn run() -> Result<(), String> {
         }
     } else {
         let program = parse(&tokens).map_err(|e| diagnostic(e.position, &e))?;
-        if mode == "--resolve" {
-            let resolution = resolve_names(&program).map_err(|e| diagnostic(e.position, &e))?;
-            write!(output, "{resolution}").map_err(|e| e.to_string())?;
-        } else {
-            write!(output, "{program}").map_err(|e| e.to_string())?;
+        match mode {
+            "--check" => {
+                check_types(&program).map_err(|e| diagnostic(e.position, &e))?;
+            }
+            "--resolve" => {
+                let resolution = resolve_names(&program).map_err(|e| diagnostic(e.position, &e))?;
+                write!(output, "{resolution}").map_err(|e| e.to_string())?;
+            }
+            _ => write!(output, "{program}").map_err(|e| e.to_string())?,
         }
     }
     output.flush().map_err(|e| e.to_string())

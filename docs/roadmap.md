@@ -100,7 +100,7 @@ The [name rules](language.md#scalar-name-resolution) and [type rules](language.m
 
 - [x] Record visibility, types, diagnostic order, and return guarantees.
 - [x] Resolve names and print scopes, declarations, and uses.
-- [ ] Check function signatures, expression types, statements, and return paths.
+- [x] Check function signatures, expression types, statements, and return paths.
 - [ ] Compare both commands with C++ and record the study results.
 
 ## Execution contracts for later phases
