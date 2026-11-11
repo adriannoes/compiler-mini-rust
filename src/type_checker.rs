@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::fmt;
 
-use crate::ast::{Block, Expr, ExprKind, Program, Stmt, TypeSyntax};
+use crate::ast::{Block, Expr, ExprKind, NodeId, NodeMap, Program, Stmt, TypeSyntax};
 use crate::resolver::{Symbol, SymbolKind};
 use crate::{AnalysisError, Position, Resolution, TokenKind, resolve_names};
 
@@ -60,12 +59,16 @@ impl Type {
 #[derive(Debug)]
 pub struct TypeAnalysis {
     pub resolution: Resolution,
-    types: HashMap<Position, Type>,
+    types: NodeMap<Type>,
 }
 
 impl TypeAnalysis {
+    pub fn type_of(&self, id: NodeId) -> Option<Type> {
+        self.types.get(id).copied()
+    }
+
     pub fn type_at(&self, position: Position) -> Option<Type> {
-        self.types.get(&position).copied()
+        self.types.at(position).copied()
     }
 }
 
@@ -90,7 +93,7 @@ pub fn check_types(program: &Program) -> Result<TypeAnalysis, AnalysisError> {
     let mut checker = Checker {
         resolution: &resolution,
         signatures: &signatures,
-        types: HashMap::new(),
+        types: NodeMap::new(),
     };
     for (function, signature) in program.functions.iter().zip(&signatures) {
         let returns = checker.block(&function.body, signature.result)?;
@@ -111,13 +114,13 @@ pub fn check_types(program: &Program) -> Result<TypeAnalysis, AnalysisError> {
 struct Checker<'a> {
     resolution: &'a Resolution,
     signatures: &'a [Signature],
-    types: HashMap<Position, Type>,
+    types: NodeMap<Type>,
 }
 
 impl Checker<'_> {
-    fn symbol(&self, position: Position) -> &Symbol {
+    fn symbol(&self, id: NodeId) -> &Symbol {
         self.resolution
-            .binding_at(position)
+            .binding(id)
             .and_then(|b| self.resolution.symbol(b.symbol))
             .expect("Name resolution records a binding for each name use.")
     }
@@ -127,10 +130,10 @@ impl Checker<'_> {
         let ty = match &expr.kind {
             ExprKind::Integer(_) => Type::Int,
             ExprKind::Boolean(_) => Type::Bool,
-            ExprKind::Name(_) => Type::from_syntax(self.symbol(position).ty)?,
+            ExprKind::Name(_) => Type::from_syntax(self.symbol(expr.id()).ty)?,
             ExprKind::Assign { target, value } => {
-                let ty = Type::from_syntax(self.symbol(target.position).ty)?;
-                self.types.insert(target.position, ty);
+                let ty = Type::from_syntax(self.symbol(target.id()).ty)?;
+                self.types.insert(target.id(), target.position, ty);
                 self.expression(value)?.require(ty, position)?;
                 ty
             }
@@ -155,7 +158,7 @@ impl Checker<'_> {
                 binary_type(*op, left, right, position)?
             }
             ExprKind::Call { name, arguments } => {
-                let SymbolKind::Function(index) = self.symbol(position).kind else {
+                let SymbolKind::Function(index) = self.symbol(expr.id()).kind else {
                     return Err(AnalysisError {
                         position,
                         message: format!("Name \"{name}\" does not refer to a function."),
@@ -180,7 +183,7 @@ impl Checker<'_> {
                 signature.result
             }
         };
-        self.types.insert(position, ty);
+        self.types.insert(expr.id(), position, ty);
         Ok(ty)
     }
 

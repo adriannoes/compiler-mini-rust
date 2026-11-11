@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::Position;
-use crate::ast::{Block, Expr, ExprKind, Name, Program, Stmt, TypeSyntax};
+use crate::ast::{Block, Expr, ExprKind, Name, NodeId, NodeMap, Program, Stmt, TypeSyntax};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct AnalysisError {
@@ -71,7 +71,7 @@ pub struct Resolution {
     scopes: Vec<Scope>,
     symbols: Vec<Symbol>,
     bindings: Vec<Binding>,
-    uses: HashMap<Position, usize>,
+    uses: NodeMap<usize>,
 }
 
 impl Resolution {
@@ -79,8 +79,12 @@ impl Resolution {
         &self.bindings
     }
 
+    pub fn binding(&self, id: NodeId) -> Option<&Binding> {
+        self.uses.get(id).map(|&index| &self.bindings[index])
+    }
+
     pub fn binding_at(&self, position: Position) -> Option<&Binding> {
-        self.uses.get(&position).map(|&index| &self.bindings[index])
+        self.uses.at(position).map(|&index| &self.bindings[index])
     }
 
     pub fn symbol(&self, id: SymbolId) -> Option<&Symbol> {
@@ -142,7 +146,7 @@ pub fn resolve_names(program: &Program) -> Result<Resolution, AnalysisError> {
             }],
             symbols: Vec::new(),
             bindings: Vec::new(),
-            uses: HashMap::new(),
+            uses: NodeMap::new(),
         },
         names: vec![HashMap::new()],
     };
@@ -214,6 +218,7 @@ impl<'p> Resolver<'p> {
         &mut self,
         scope: usize,
         name: &str,
+        id: NodeId,
         position: Position,
         kind: UseKind,
     ) -> Result<(), AnalysisError> {
@@ -239,7 +244,7 @@ impl<'p> Resolver<'p> {
         }
         self.result
             .uses
-            .insert(position, self.result.bindings.len());
+            .insert(id, position, self.result.bindings.len());
         self.result.bindings.push(Binding {
             symbol,
             position,
@@ -301,13 +306,21 @@ impl<'p> Resolver<'p> {
 
     fn expression(&mut self, scope: usize, expr: &Expr) -> Result<(), AnalysisError> {
         match &expr.kind {
-            ExprKind::Name(name) => self.bind(scope, name, expr.position, UseKind::Read)?,
+            ExprKind::Name(name) => {
+                self.bind(scope, name, expr.id(), expr.position, UseKind::Read)?
+            }
             ExprKind::Assign { target, value } => {
-                self.bind(scope, &target.text, target.position, UseKind::Write)?;
+                self.bind(
+                    scope,
+                    &target.text,
+                    target.id(),
+                    target.position,
+                    UseKind::Write,
+                )?;
                 self.expression(scope, value)?;
             }
             ExprKind::Call { name, arguments } => {
-                self.bind(scope, name, expr.position, UseKind::Call)?;
+                self.bind(scope, name, expr.id(), expr.position, UseKind::Call)?;
                 for arg in arguments {
                     self.expression(scope, arg)?;
                 }

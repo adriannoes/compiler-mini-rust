@@ -46,6 +46,54 @@ fn analysis_records_expression_types_targets_and_resolved_symbols() {
 }
 
 #[test]
+fn joined_trees_keep_distinct_bindings_and_types_at_shared_positions() {
+    let first = lex(b"int f(int x) {\n  x = f(x);\n  return x;\n}").unwrap();
+    let second = lex(b"bool g(bool y) {\n  y = g(y);\n  return y;\n}").unwrap();
+    let mut program = parse(&first).unwrap();
+    assert_eq!(program, parse(&first).unwrap());
+    program.functions.extend(parse(&second).unwrap().functions);
+
+    let analysis = check_types(&program).unwrap();
+    for (function, expected) in program.functions.iter().zip([Type::Int, Type::Bool]) {
+        let [
+            Stmt::Expression { value: assign, .. },
+            Stmt::Return {
+                value: Some(read), ..
+            },
+        ] = function.body.statements.as_slice()
+        else {
+            panic!("Expected an assignment and a return.");
+        };
+        let ExprKind::Assign {
+            target,
+            value: call,
+        } = &assign.kind
+        else {
+            panic!("Expected an assignment.");
+        };
+        let ExprKind::Call { arguments, .. } = &call.kind else {
+            panic!("Expected a call.");
+        };
+        let parameter = &function.parameters[0].name;
+        for (id, position, declaration) in [
+            (target.id(), target.position, parameter),
+            (arguments[0].id(), arguments[0].position, parameter),
+            (read.id(), read.position, parameter),
+            (call.id(), call.position, &function.name),
+        ] {
+            let binding = analysis.resolution.binding(id).unwrap();
+            let symbol = analysis.resolution.symbol(binding.symbol).unwrap();
+            assert_eq!(symbol.name, declaration.text);
+            assert_eq!(analysis.type_of(id), Some(expected));
+            assert!(analysis.resolution.binding_at(position).is_none());
+            assert_eq!(analysis.type_at(position), None);
+        }
+        assert_eq!(analysis.type_of(assign.id()), Some(expected));
+        assert_eq!(analysis.type_at(assign.position), None);
+    }
+}
+
+#[test]
 fn static_checks_accept_unevaluated_arithmetic_and_uninitialized_reads() {
     for source in [
         "",

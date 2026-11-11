@@ -110,9 +110,14 @@ Its result owns the declaration names. Each `SymbolId` indexes a vector in decla
 Copying each declaration name costs storage. It lets the result outlive the source tree.
 The resolver visits scopes, symbols, and uses in a fixed order for printing. Hash table iteration does not determine the output order.
 
-The [type checker](../src/type_checker.rs) uses the binding at each name position to find its declared type.
-The result stores expression types by source position. These positions refer to token starts in one program from the parser.
-Each result owns its symbol table and type information. Symbol identifiers and positions belong to that analysis.
+Each expression and name has a `NodeId`. The constructors assign these identifiers from a counter shared by all trees in the process.
+Moving a function into another program preserves its node identifiers. Two functions can have nodes at the same line and column.
+The [type checker](../src/type_checker.rs) uses node identifiers to look up bindings and store types.
+Use `Resolution::binding` for a name use and `TypeAnalysis::type_of` for an expression or assignment target.
+The analysis owns these tables. Callers can keep identifiers and query the results after they drop the tree.
+A second index supports queries by position. Both `binding_at` and `type_at` return `None` if multiple entries share that position.
+Tree equality compares syntax and positions. Parsing the same input twice produces equal trees with distinct node identifiers.
+
 For `int x = x;`, the initializer reads the new integer variable. Execution will determine whether the variable has a value.
 
 Return analysis works on statement structure. In `if (ok) return 1; else return 2;`, both branches guarantee a return.

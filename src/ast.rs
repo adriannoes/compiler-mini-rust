@@ -1,16 +1,41 @@
 use crate::{Position, TokenKind};
 
 mod display;
+mod node;
+
+pub use node::NodeId;
+pub(crate) use node::NodeMap;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program {
     pub functions: Vec<Function>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Eq)]
 pub struct Name {
+    id: NodeId,
     pub text: String,
     pub position: Position,
+}
+
+impl Name {
+    pub fn new(text: String, position: Position) -> Self {
+        Self {
+            id: NodeId::new(),
+            text,
+            position,
+        }
+    }
+
+    pub fn id(&self) -> NodeId {
+        self.id
+    }
+}
+
+impl PartialEq for Name {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text && self.position == other.position
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,10 +94,31 @@ pub enum Stmt {
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Eq)]
 pub struct Expr {
+    id: NodeId,
     pub position: Position,
     pub kind: ExprKind,
+}
+
+impl Expr {
+    pub fn new(position: Position, kind: ExprKind) -> Self {
+        Self {
+            id: NodeId::new(),
+            position,
+            kind,
+        }
+    }
+
+    pub fn id(&self) -> NodeId {
+        self.id
+    }
+}
+
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        self.position == other.position && self.kind == other.kind
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

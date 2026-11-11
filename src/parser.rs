@@ -88,10 +88,7 @@ impl<'t> Parser<'t> {
 
     fn name(&mut self, message: &str) -> Result<Name, ParseError> {
         let token = self.expect(TokenKind::Identifier, message)?;
-        Ok(Name {
-            text: token.text.clone(),
-            position: token.position,
-        })
+        Ok(Name::new(token.text.clone(), token.position))
     }
 
     fn function(&mut self) -> Result<Function, ParseError> {
@@ -236,15 +233,12 @@ impl<'t> Parser<'t> {
                 message: "Expected a name before \"=\".".to_owned(),
             });
         };
-        let target = Name {
-            text,
-            position: left.position,
-        };
+        let target = Name::new(text, left.position);
         let value = Box::new(self.expression()?);
-        Ok(Expr {
-            position: equals.position,
-            kind: ExprKind::Assign { target, value },
-        })
+        Ok(Expr::new(
+            equals.position,
+            ExprKind::Assign { target, value },
+        ))
     }
 
     fn binary(&mut self, minimum: u8) -> Result<Expr, ParseError> {
@@ -255,14 +249,14 @@ impl<'t> Parser<'t> {
             }
             let op = self.advance();
             let right = self.binary(precedence + 1)?;
-            left = Expr {
-                position: op.position,
-                kind: ExprKind::Binary {
+            left = Expr::new(
+                op.position,
+                ExprKind::Binary {
                     left: Box::new(left),
                     op: op.kind,
                     right: Box::new(right),
                 },
-            };
+            );
         }
         Ok(left)
     }
@@ -270,13 +264,13 @@ impl<'t> Parser<'t> {
     fn unary(&mut self) -> Result<Expr, ParseError> {
         if matches!(self.peek().kind, TokenKind::Bang | TokenKind::Minus) {
             let op = self.advance();
-            return Ok(Expr {
-                position: op.position,
-                kind: ExprKind::Unary {
+            return Ok(Expr::new(
+                op.position,
+                ExprKind::Unary {
                     op: op.kind,
                     operand: Box::new(self.unary()?),
                 },
-            });
+            ));
         }
         self.primary()
     }
@@ -303,10 +297,7 @@ impl<'t> Parser<'t> {
             }
             _ => return Err(ParseError::expected(token, "Expected an expression.")),
         };
-        Ok(Expr {
-            position: token.position,
-            kind,
-        })
+        Ok(Expr::new(token.position, kind))
     }
 }
 
