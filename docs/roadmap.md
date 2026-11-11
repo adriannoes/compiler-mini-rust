@@ -8,7 +8,7 @@ Both paths must agree on results, errors, and source positions.
 |-------|-------------|-------------|--------|
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
 | 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
-| 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Pending |
+| 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | In progress |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Pending |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
@@ -59,6 +59,16 @@ After the first `=`, the scanner can accept `ASSIGN`. A second adjacent `=` exte
 This rule picks the longest supported match. A single byte of lookahead suffices for every Mini-C operator.
 After `&`, only another `&` completes a token. A different byte or the end of input produces an error at the first `&`.
 A slash followed by `/` or `*` starts a comment. The scanner resumes token recognition after the comment ends.
+
+## Phase 3
+
+The [scalar grammar](language.md#scalar-syntax) defines the input and output of the parser.
+
+- [x] Record the grammar, positions, and error contract.
+- [ ] Parse expressions, blocks, and functions without parameters. Print their trees.
+- [ ] Parse declarations, parameters, and named calls.
+- [ ] Parse conditionals and loops. Compare scalar trees and errors with C++.
+- [ ] Work through FIRST and FOLLOW sets and a shift/reduce example.
 
 ## Execution contracts for later phases
 

@@ -61,3 +61,63 @@ Unterminated block comment.
 
 The lexer quotes printable ASCII and escapes quotes and backslashes. It prints other unexpected bytes as two uppercase hexadecimal digits.
 Invalid arguments and file errors also produce a diagnostic on standard error and exit with status 1.
+
+## Scalar syntax
+
+The parser groups tokens into an abstract syntax tree (AST). Each function owns its return type, name, parameters, and body.
+A program can contain zero or more function definitions. Syntax permits a program without `main`.
+
+The grammar below uses braces for repetition and square brackets for optional syntax. Quoted text denotes a token.
+
+```ebnf
+program     = { function }, EOF ;
+function    = type, IDENTIFIER, "(", [ parameters ], ")", block ;
+type        = "int" | "bool" | "void" ;
+parameters  = parameter, { ",", parameter } ;
+parameter   = type, IDENTIFIER ;
+block       = "{", { declaration | statement }, "}" ;
+declaration = type, IDENTIFIER, [ "=", expression ], ";" ;
+statement   = block | "if", "(", expression, ")", statement, [ "else", statement ]
+            | "while", "(", expression, ")", statement
+            | "return", [ expression ], ";" | [ expression ], ";" ;
+expression  = assignment ;
+assignment  = logical_or, [ "=", assignment ] ;
+logical_or  = logical_and, { "||", logical_and } ;
+logical_and = equality, { "&&", equality } ;
+equality    = comparison, { ( "==" | "!=" ), comparison } ;
+comparison  = sum, { ( "<" | "<=" | ">" | ">=" ), sum } ;
+sum         = product, { ( "+" | "-" ), product } ;
+product     = unary, { ( "*" | "/" | "%" ), unary } ;
+unary       = ( "!" | "-" ), unary | primary ;
+primary     = INTEGER | "true" | "false" | IDENTIFIER, [ "(", [ arguments ], ")" ]
+            | "(", expression, ")" ;
+arguments   = expression, { ",", expression } ;
+```
+
+Binary operators at the same level group to the left. Assignment and unary operators group to the right.
+Parentheses change grouping and leave no separate node. The left side of an assignment must reduce to a name.
+The parser reports an invalid target at the equals sign. Integer nodes keep every decimal digit, including leading zeroes.
+A call requires a bare function name. Each parameter requires a type and a name.
+
+A declaration belongs directly to a block. The body of an `if` or `while` accepts one statement.
+An `else` belongs to the nearest open `if` unless a block closes that branch first.
+The parser accepts undeclared names and mixed types. Name resolution and type analysis belong to phase 4.
+Brackets remain valid tokens. Array declarations and indexed expressions belong to phase 7.
+
+## AST command
+
+Use `--ast <file>` to print the scalar syntax tree. The command completes lexing before parsing.
+Each tree level adds two spaces. Each positioned node ends with `@line:column`.
+
+| Node | Source position |
+|------|-----------------|
+| Function, parameter, variable, name, call | Identifier |
+| Type or literal | Keyword or literal |
+| Binary, unary, assignment | Operator |
+| Block or empty statement | Opening brace or semicolon |
+| Return, conditional, loop | Statement keyword |
+| Expression statement | First token, including an opening parenthesis |
+
+Success writes the complete tree to standard output and exits with status 0.
+The first lexical or syntax error writes a diagnostic to standard error and exits with status 1. Standard output stays empty.
+A syntax diagnostic identifies the unexpected token or the invalid assignment operator. An incomplete program can report the position of `EOF`.
