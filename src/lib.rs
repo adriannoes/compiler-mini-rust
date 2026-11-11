@@ -10,11 +10,13 @@ pub mod resolver;
 mod runtime;
 mod token;
 mod type_checker;
+mod vm;
+pub use vm::{VmError, execute_bytecode, execute_bytecode_with_limits};
 
-pub use interpreter::{ExecutionLimits, InterpretError, interpret, interpret_with_limits};
+pub use interpreter::{InterpretError, interpret, interpret_with_limits};
 pub use lexer::{LexError, LexErrorKind, lex};
 pub use parser::{ParseError, parse};
 pub use resolver::{AnalysisError, Resolution, resolve_names};
-pub use runtime::{RuntimeError, Value};
+pub use runtime::{ExecutionLimits, RuntimeError, Value};
 pub use token::{Position, Token, TokenKind};
 pub use type_checker::{Type, TypeAnalysis, check_types};

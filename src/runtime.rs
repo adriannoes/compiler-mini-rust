@@ -42,6 +42,36 @@ impl fmt::Display for RuntimeError {
 
 impl std::error::Error for RuntimeError {}
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExecutionLimits {
+    pub max_steps: usize,
+    pub max_call_depth: usize,
+}
+
+impl Default for ExecutionLimits {
+    fn default() -> Self {
+        Self {
+            max_steps: 1_000_000,
+            max_call_depth: 128,
+        }
+    }
+}
+
+pub(crate) const INVALID_LIMITS: &str = "Execution limits must be greater than zero.";
+
+impl ExecutionLimits {
+    pub(crate) fn valid(self) -> bool {
+        self.max_steps > 0 && self.max_call_depth > 0
+    }
+}
+
+pub(crate) fn step(remaining: &mut usize, position: Position) -> Result<(), RuntimeError> {
+    *remaining = remaining
+        .checked_sub(1)
+        .ok_or_else(|| RuntimeError::new(position, "The execution step limit was reached."))?;
+    Ok(())
+}
+
 pub(crate) fn integer(
     digits: &str,
     negative: bool,

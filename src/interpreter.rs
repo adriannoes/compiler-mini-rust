@@ -4,23 +4,8 @@ use std::ops::ControlFlow;
 
 use crate::ast::{Block, Expr, ExprKind, Function, Name, NodeId, Program, Stmt};
 use crate::resolver::{SymbolId, SymbolKind};
-use crate::runtime::{self, RuntimeError, Value};
+use crate::runtime::{self, ExecutionLimits, RuntimeError, Value};
 use crate::{AnalysisError, Position, Resolution, TokenKind, check_types};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ExecutionLimits {
-    pub max_steps: usize,
-    pub max_call_depth: usize,
-}
-
-impl Default for ExecutionLimits {
-    fn default() -> Self {
-        Self {
-            max_steps: 1_000_000,
-            max_call_depth: 128,
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
@@ -42,7 +27,7 @@ impl InterpretError {
 impl fmt::Display for InterpretError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidLimits => f.write_str("Execution limits must be greater than zero."),
+            Self::InvalidLimits => f.write_str(runtime::INVALID_LIMITS),
             Self::Analysis(error) => error.fmt(f),
             Self::Runtime(error) => error.fmt(f),
         }
@@ -68,7 +53,7 @@ pub fn interpret_with_limits(
     entry: &str,
     limits: ExecutionLimits,
 ) -> Result<Value, InterpretError> {
-    if limits.max_steps == 0 || limits.max_call_depth == 0 {
+    if !limits.valid() {
         return Err(InterpretError::InvalidLimits);
     }
     let analysis = check_types(program).map_err(InterpretError::Analysis)?;
@@ -159,11 +144,7 @@ impl Interpreter<'_> {
     }
 
     fn step(&mut self, position: Position) -> Result<(), RuntimeError> {
-        self.steps_left = self
-            .steps_left
-            .checked_sub(1)
-            .ok_or_else(|| RuntimeError::new(position, "The execution step limit was reached."))?;
-        Ok(())
+        runtime::step(&mut self.steps_left, position)
     }
 
     fn binding(&self, id: NodeId) -> SymbolId {
