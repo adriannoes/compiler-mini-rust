@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use compiler_mini_rust::{
-    Position, Value, check_types, compile_bytecode, interpret, lex, parse, resolve_names,
+    Position, Value, check_types, compile_bytecode, execute_bytecode, interpret, lex, parse,
+    resolve_names,
 };
 
 const MODES: &[&str] = &[
@@ -18,6 +19,7 @@ const MODES: &[&str] = &[
     "--check",
     "--run",
     "--bytecode",
+    "--run-vm",
 ];
 
 enum CliError {
@@ -102,18 +104,25 @@ fn run() -> Result<(), CliError> {
         }
     } else {
         let program = parse(&tokens).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;
+        let compile = || {
+            compile_bytecode(&program)
+                .map_err(|error| diagnostic(Some(error.position), error.to_string()))
+        };
         match mode {
-            "--run" => {
-                let value = interpret(&program, "main")
-                    .map_err(|error| diagnostic(error.position(), error.to_string()))?;
+            "--run" | "--run-vm" => {
+                let value = if mode == "--run" {
+                    interpret(&program, "main")
+                        .map_err(|error| diagnostic(error.position(), error.to_string()))?
+                } else {
+                    execute_bytecode(&compile()?, "main")
+                        .map_err(|error| diagnostic(error.position(), error.to_string()))?
+                };
                 if value != Value::Void {
                     writeln!(output, "{value}")?;
                 }
             }
             "--bytecode" => {
-                let bytecode = compile_bytecode(&program)
-                    .map_err(|error| diagnostic(Some(error.position), error.to_string()))?;
-                write!(output, "{bytecode}")?;
+                write!(output, "{}", compile()?)?;
             }
             "--check" => {
                 check_types(&program).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;

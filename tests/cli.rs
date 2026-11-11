@@ -221,7 +221,7 @@ fn type_check_is_silent_on_success_and_reports_a_position_on_failure() {
 
 #[test]
 fn analysis_and_run_commands_require_one_file_and_propagate_earlier_errors() {
-    for mode in ["--resolve", "--check", "--run", "--bytecode"] {
+    for mode in ["--resolve", "--check", "--run", "--bytecode", "--run-vm"] {
         for args in [&[mode][..], &[mode, "file", "extra"]] {
             let output = run(args);
             assert_eq!(output.status.code(), Some(1));
@@ -336,13 +336,35 @@ fn bytecode_prints_the_reference_listings() {
 }
 
 #[test]
+fn vm_command_matches_run_output_errors_and_status() {
+    for path in [
+        "examples/return_42.mc",
+        "examples/calls.mc",
+        "examples/factorial.mc",
+        "examples/fibonacci.mc",
+        "examples/runtime_error.mc",
+        "examples/control_flow.mc",
+        "examples/short_circuit.mc",
+        "tests/fixtures/void_main.mc",
+        "examples/type_error.mc",
+        "examples/expressions.mc",
+    ] {
+        let expected = run(&["--run", path]);
+        let actual = run(&["--run-vm", path]);
+        assert_eq!(actual.status.code(), expected.status.code(), "{path}");
+        assert_eq!(actual.stdout, expected.stdout, "{path}");
+        assert_eq!(actual.stderr, expected.stderr, "{path}");
+    }
+}
+
+#[test]
 fn help_lists_available_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n       compiler-mini-rust --run-vm <file>\n"
         );
         assert!(output.stderr.is_empty());
     }
