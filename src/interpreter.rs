@@ -7,8 +7,24 @@ use crate::resolver::SymbolId;
 use crate::runtime::{self, RuntimeError, Value};
 use crate::{AnalysisError, Position, Resolution, TokenKind, check_types};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExecutionLimits {
+    pub max_steps: usize,
+    pub max_call_depth: usize,
+}
+
+impl Default for ExecutionLimits {
+    fn default() -> Self {
+        Self {
+            max_steps: 1_000_000,
+            max_call_depth: 128,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
+    InvalidLimits,
     Analysis(AnalysisError),
     Runtime(RuntimeError),
 }
@@ -16,6 +32,7 @@ pub enum InterpretError {
 impl InterpretError {
     pub fn position(&self) -> Option<Position> {
         match self {
+            Self::InvalidLimits => None,
             Self::Analysis(error) => Some(error.position),
             Self::Runtime(error) => Some(error.position),
         }
@@ -25,6 +42,7 @@ impl InterpretError {
 impl fmt::Display for InterpretError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidLimits => f.write_str("Execution limits must be greater than zero."),
             Self::Analysis(error) => error.fmt(f),
             Self::Runtime(error) => error.fmt(f),
         }
@@ -34,6 +52,7 @@ impl fmt::Display for InterpretError {
 impl std::error::Error for InterpretError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::InvalidLimits => None,
             Self::Analysis(error) => Some(error),
             Self::Runtime(error) => Some(error),
         }
@@ -41,6 +60,17 @@ impl std::error::Error for InterpretError {
 }
 
 pub fn interpret(program: &Program, entry: &str) -> Result<Value, InterpretError> {
+    interpret_with_limits(program, entry, ExecutionLimits::default())
+}
+
+pub fn interpret_with_limits(
+    program: &Program,
+    entry: &str,
+    limits: ExecutionLimits,
+) -> Result<Value, InterpretError> {
+    if limits.max_steps == 0 || limits.max_call_depth == 0 {
+        return Err(InterpretError::InvalidLimits);
+    }
     let analysis = check_types(program).map_err(InterpretError::Analysis)?;
     let function = program
         .functions
@@ -60,7 +90,11 @@ pub fn interpret(program: &Program, entry: &str) -> Result<Value, InterpretError
     }
     let mut interpreter = Interpreter {
         resolution: analysis.resolution,
+        steps_left: limits.max_steps,
     };
+    interpreter
+        .step(function.body.position)
+        .map_err(InterpretError::Runtime)?;
     let mut frame = Frame::new();
     match interpreter
         .block_contents(&mut frame, &function.body)
@@ -103,9 +137,18 @@ impl Frame {
 
 struct Interpreter {
     resolution: Resolution,
+    steps_left: usize,
 }
 
 impl Interpreter {
+    fn step(&mut self, position: Position) -> Result<(), RuntimeError> {
+        self.steps_left = self
+            .steps_left
+            .checked_sub(1)
+            .ok_or_else(|| RuntimeError::new(position, "The execution step limit was reached."))?;
+        Ok(())
+    }
+
     fn binding(&self, id: NodeId) -> SymbolId {
         self.resolution
             .binding(id)
@@ -129,6 +172,7 @@ impl Interpreter {
     }
 
     fn statement(&mut self, frame: &mut Frame, statement: &Stmt) -> Result<Flow, RuntimeError> {
+        self.step(statement.position())?;
         match statement {
             Stmt::Block(block) => {
                 frame.scopes.push(Environment::new());
@@ -157,11 +201,27 @@ impl Interpreter {
                 self.expression(frame, value)?;
             }
             Stmt::Empty(_) => {}
-            Stmt::If { position, .. } | Stmt::While { position, .. } => {
-                return Err(RuntimeError::new(
-                    *position,
-                    "Control flow requires function execution.",
-                ));
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                if self.expression(frame, condition)? == Value::Bool(true) {
+                    return self.statement(frame, then_branch);
+                }
+                if let Some(branch) = else_branch {
+                    return self.statement(frame, branch);
+                }
+            }
+            Stmt::While {
+                condition, body, ..
+            } => {
+                while self.expression(frame, condition)? == Value::Bool(true) {
+                    if let flow @ ControlFlow::Break(_) = self.statement(frame, body)? {
+                        return Ok(flow);
+                    }
+                }
             }
         }
         Ok(ControlFlow::Continue(()))
@@ -169,6 +229,7 @@ impl Interpreter {
 
     fn expression(&mut self, frame: &mut Frame, expr: &Expr) -> Result<Value, RuntimeError> {
         let position = expr.position;
+        self.step(position)?;
         match &expr.kind {
             ExprKind::Integer(digits) => runtime::integer(digits, false, position),
             ExprKind::Boolean(value) => Ok(Value::Bool(*value)),
@@ -184,6 +245,7 @@ impl Interpreter {
                 if *op == TokenKind::Minus
                     && let ExprKind::Integer(digits) = &operand.kind
                 {
+                    self.step(operand.position)?;
                     return runtime::integer(digits, true, position);
                 }
                 let value = self.expression(frame, operand)?;

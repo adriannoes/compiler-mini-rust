@@ -94,6 +94,20 @@ pub enum Stmt {
     },
 }
 
+impl Stmt {
+    pub(crate) fn position(&self) -> Position {
+        match self {
+            Self::Block(block) => block.position,
+            Self::Variable { name, .. } => name.position,
+            Self::Return { position, .. }
+            | Self::Expression { position, .. }
+            | Self::Empty(position)
+            | Self::If { position, .. }
+            | Self::While { position, .. } => *position,
+        }
+    }
+}
+
 #[derive(Debug, Eq)]
 pub struct Expr {
     id: NodeId,

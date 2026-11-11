@@ -158,6 +158,77 @@ fn arithmetic_reports_the_literal_or_the_operator() {
     }
 }
 
+fn limited(source: &str, steps: usize, depth: usize) -> Result<Value, InterpretError> {
+    let limits = compiler_mini_rust::ExecutionLimits {
+        max_steps: steps,
+        max_call_depth: depth,
+    };
+    compiler_mini_rust::interpret_with_limits(&program(source), "main", limits)
+}
+
+#[test]
+fn invalid_limits_precede_static_analysis() {
+    for (steps, depth) in [(0, 1), (1, 0)] {
+        let error = limited("void bad() { missing; }", steps, depth).unwrap_err();
+        assert_eq!(error, InterpretError::InvalidLimits);
+        assert_eq!(error.position(), None);
+        assert_eq!(
+            error.to_string(),
+            "Execution limits must be greater than zero."
+        );
+    }
+}
+
+#[test]
+fn limits_charge_only_executed_nodes_at_their_own_positions() {
+    let source = "int main() { return 42; }";
+    assert_eq!(limited(source, 3, 1), Ok(Value::Int(42)));
+    let minimum = "int main() { return -9223372036854775808; }";
+    assert_eq!(limited(minimum, 4, 1), Ok(Value::Int(i64::MIN)));
+    for (source, steps, line, column) in [
+        (source, 2, 1, 21),
+        (minimum, 3, 1, 22),
+        ("void main() {\n  while (true) ;\n}", 6, 2, 10),
+        ("void main() {\n  int x; }", 1, 2, 7),
+    ] {
+        let error = limited(source, steps, 128).unwrap_err();
+        assert_eq!(error.position(), Some(Position { line, column }));
+        assert_eq!(error.to_string(), "The execution step limit was reached.");
+    }
+    assert_eq!(
+        limited("bool main() { return true || (1 / 0 == 0); }", 4, 1),
+        Ok(Value::Bool(true))
+    );
+    assert_eq!(
+        limited("int main() { int x; return x = 42; }", 5, 1),
+        Ok(Value::Int(42))
+    );
+}
+
+#[test]
+fn branches_and_loops_run_only_the_selected_body() {
+    assert_eq!(
+        run(
+            "int main() { int x = 0; if (true) if (false) x = 1 / 0; else x = 2; while (false) 1 / 0; return x; }"
+        ),
+        Ok(Value::Int(2))
+    );
+    assert_eq!(
+        run("int main() { int x = 0; while ((x = x + 1) < 4) ; return x; }"),
+        Ok(Value::Int(4))
+    );
+    assert_eq!(
+        run("void main() { while (true) { if (true) return; } 1 / 0; }"),
+        Ok(Value::Void)
+    );
+    runtime_error(
+        "int main() { int i = 0; while (i < 2) { int x; if (i == 0) x = 1; i = i + 1;\n  x; } return 0; }",
+        2,
+        3,
+        "The variable \"x\" has no value.",
+    );
+}
+
 #[test]
 fn repeated_execution_owns_its_result_and_preserves_the_tree() {
     let answer = {
