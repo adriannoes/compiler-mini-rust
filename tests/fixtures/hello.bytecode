@@ -1,0 +1,10 @@
+bytecode
+function 0 "main" int parameters=0 @3:5
+  constant 0 int "0"
+  0 STEP @3:12
+  1 STEP @4:3
+  2 STEP @4:10
+  3 LOAD_CONSTANT 0 @4:10
+  4 RETURN @4:3
+  5 UNREACHABLE @3:12
+end
