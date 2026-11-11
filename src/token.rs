@@ -7,6 +7,13 @@ pub struct Position {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TokenKind {
     Int,
+    Bool,
+    Void,
+    If,
+    Else,
+    While,
+    True,
+    False,
     Return,
     Identifier,
     Integer,
@@ -22,6 +29,13 @@ impl TokenKind {
     pub fn name(self) -> &'static str {
         match self {
             Self::Int => "INT",
+            Self::Bool => "BOOL",
+            Self::Void => "VOID",
+            Self::If => "IF",
+            Self::Else => "ELSE",
+            Self::While => "WHILE",
+            Self::True => "TRUE",
+            Self::False => "FALSE",
             Self::Return => "RETURN",
             Self::Identifier => "IDENTIFIER",
             Self::Integer => "INTEGER",

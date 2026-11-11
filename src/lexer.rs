@@ -124,6 +124,13 @@ impl Scanner<'_> {
                 }
                 match &self.source[start..self.offset] {
                     b"int" => TokenKind::Int,
+                    b"bool" => TokenKind::Bool,
+                    b"void" => TokenKind::Void,
+                    b"if" => TokenKind::If,
+                    b"else" => TokenKind::Else,
+                    b"while" => TokenKind::While,
+                    b"true" => TokenKind::True,
+                    b"false" => TokenKind::False,
                     b"return" => TokenKind::Return,
                     _ => TokenKind::Identifier,
                 }

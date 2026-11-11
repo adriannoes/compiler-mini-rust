@@ -47,6 +47,37 @@ fn keywords_require_a_complete_case_sensitive_identifier() {
 }
 
 #[test]
+fn only_exact_keyword_spellings_are_reserved() {
+    use TokenKind::*;
+    for (word, kind) in [
+        ("int", Int),
+        ("bool", Bool),
+        ("void", Void),
+        ("if", If),
+        ("else", Else),
+        ("while", While),
+        ("return", Return),
+        ("true", True),
+        ("false", False),
+    ] {
+        assert_tokens(
+            word.as_bytes(),
+            &[(kind, word, 1, 1), (Eof, "", 1, word.len() + 1)],
+        );
+        for name in [
+            format!("{word}2"),
+            format!("_{word}"),
+            word.to_ascii_uppercase(),
+        ] {
+            assert_tokens(
+                name.as_bytes(),
+                &[(Identifier, &name, 1, 1), (Eof, "", 1, name.len() + 1)],
+            );
+        }
+    }
+}
+
+#[test]
 fn integer_text_survives_the_source_buffer_and_preserves_all_digits() {
     let tokens = {
         let source = String::from("0009223372036854775808000");

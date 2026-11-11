@@ -43,7 +43,7 @@ The Rust tests read these files directly. They require only Cargo and the Rust t
 The [lexical contract](language.md#lexical-contract) specifies all 35 token kinds, including both brackets.
 
 - [x] Record the token spellings, names, and boundaries.
-- [ ] Recognize the seven additional keywords and test complete identifier matches.
+- [x] Recognize the seven additional keywords and test complete identifier matches.
 - [ ] Recognize operators, commas, and brackets. Test comment boundaries and positioned errors.
 - [ ] Compare the token command with C++ on every reference Mini-C example.
 
