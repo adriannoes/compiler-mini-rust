@@ -1,0 +1,43 @@
+Program
+  Function "choose" @2:5
+    Type INT @2:1
+    Parameter "first" @2:17
+      Type BOOL @2:12
+    Parameter "second" @2:29
+      Type BOOL @2:24
+    Block @2:37
+      Variable "result" @3:7
+        Type INT @3:3
+        Integer "0" @3:16
+      If @4:3
+        Condition
+          Name "first" @4:7
+        Then
+          If @5:5
+            Condition
+              Name "second" @5:9
+            Then
+              Expression @6:7
+                Assign @6:14
+                  Name "result" @6:7
+                  Integer "1" @6:16
+            Else
+              Expression @8:7
+                Assign @8:14
+                  Name "result" @8:7
+                  Integer "2" @8:16
+      While @9:3
+        Condition
+          Binary LESS @9:17
+            Name "result" @9:10
+            Integer "3" @9:19
+        Body
+          Block @9:22
+            Expression @10:5
+              Assign @10:12
+                Name "result" @10:5
+                Binary PLUS @10:21
+                  Name "result" @10:14
+                  Integer "1" @10:23
+      Return @12:3
+        Name "result" @12:10

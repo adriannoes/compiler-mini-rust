@@ -44,6 +44,10 @@ impl TreePrinter<'_, '_> {
         )
     }
 
+    fn label(&mut self, depth: usize, label: &str) -> fmt::Result {
+        writeln!(self.out, "{:width$}{label}", "", width = depth * 2)
+    }
+
     fn ty(&mut self, depth: usize, ty: &TypeSyntax) -> fmt::Result {
         self.node(
             depth,
@@ -91,6 +95,34 @@ impl TreePrinter<'_, '_> {
                 self.expression(depth + 1, value)
             }
             Stmt::Empty(position) => self.node(depth, "Empty", *position),
+            Stmt::If {
+                position,
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.node(depth, "If", *position)?;
+                self.label(depth + 1, "Condition")?;
+                self.expression(depth + 2, condition)?;
+                self.label(depth + 1, "Then")?;
+                self.statement(depth + 2, then_branch)?;
+                if let Some(branch) = else_branch {
+                    self.label(depth + 1, "Else")?;
+                    self.statement(depth + 2, branch)?;
+                }
+                Ok(())
+            }
+            Stmt::While {
+                position,
+                condition,
+                body,
+            } => {
+                self.node(depth, "While", *position)?;
+                self.label(depth + 1, "Condition")?;
+                self.expression(depth + 2, condition)?;
+                self.label(depth + 1, "Body")?;
+                self.statement(depth + 2, body)
+            }
         }
     }
 

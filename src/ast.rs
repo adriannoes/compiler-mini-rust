@@ -56,6 +56,17 @@ pub enum Stmt {
         value: Expr,
     },
     Empty(Position),
+    If {
+        position: Position,
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
+    While {
+        position: Position,
+        condition: Expr,
+        body: Box<Stmt>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]

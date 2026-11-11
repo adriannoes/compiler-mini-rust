@@ -206,6 +206,108 @@ fn lists_and_declarations_report_the_offending_token() {
 }
 
 #[test]
+fn an_else_attaches_to_the_nearest_open_if() {
+    let tree = program("void f() { if (a) if (b) ; else return; }");
+    let Stmt::If {
+        then_branch,
+        else_branch: None,
+        ..
+    } = &tree.functions[0].body.statements[0]
+    else {
+        panic!("Expected the outer if to have one branch.")
+    };
+    assert!(matches!(
+        then_branch.as_ref(),
+        Stmt::If {
+            else_branch: Some(_),
+            ..
+        }
+    ));
+
+    let tree = program("void f() { if (a) { if (b) ; } else return; }");
+    let Stmt::If {
+        then_branch,
+        else_branch: Some(_),
+        ..
+    } = &tree.functions[0].body.statements[0]
+    else {
+        panic!("Expected an outer else branch.")
+    };
+    let Stmt::Block(block) = then_branch.as_ref() else {
+        panic!("Expected a block.")
+    };
+    assert!(matches!(
+        block.statements[0],
+        Stmt::If {
+            else_branch: None,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn loops_accept_a_single_statement_including_another_loop() {
+    let tree = program("void f() { while (a = 1) while (true) ; }");
+    let Stmt::While {
+        condition, body, ..
+    } = &tree.functions[0].body.statements[0]
+    else {
+        panic!("Expected a loop.")
+    };
+    assert!(matches!(condition.kind, ExprKind::Assign { .. }));
+    let Stmt::While { body, .. } = body.as_ref() else {
+        panic!("Expected a nested loop.")
+    };
+    assert!(matches!(body.as_ref(), Stmt::Empty(_)));
+}
+
+#[test]
+fn control_flow_errors_point_to_the_unexpected_token() {
+    for (source, message) in [
+        (
+            "int f() { if\ntrue) ; }",
+            "Expected \"(\" after \"if\". Received TRUE.",
+        ),
+        (
+            "int f() { if (\n) ; }",
+            "Expected an expression. Received RIGHT_PAREN.",
+        ),
+        (
+            "int f() { if (true\nreturn; }",
+            "Expected \")\" after condition. Received RETURN.",
+        ),
+        (
+            "int f() { if (true)\nint x; }",
+            "Expected an expression. Received INT.",
+        ),
+        (
+            "int f() { if (true) ; else\n}",
+            "Expected an expression. Received RIGHT_BRACE.",
+        ),
+        (
+            "int f() {\nelse ; }",
+            "Expected an expression. Received ELSE.",
+        ),
+        (
+            "int f() { while\ntrue) ; }",
+            "Expected \"(\" after \"while\". Received TRUE.",
+        ),
+        (
+            "int f() { while (true)\n",
+            "Expected an expression. Received EOF.",
+        ),
+        (
+            "int f() { while (true)\nbool x; }",
+            "Expected an expression. Received BOOL.",
+        ),
+    ] {
+        let error = parse(&lex(source.as_bytes()).unwrap()).unwrap_err();
+        assert_eq!(error.position, Position { line: 2, column: 1 }, "{source}");
+        assert_eq!(error.message, message, "{source}");
+    }
+}
+
+#[test]
 fn input_tokens_require_a_final_eof() {
     let tokens = lex(b"int").unwrap();
     for input in [&[][..], &tokens[..1]] {

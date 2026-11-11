@@ -166,10 +166,43 @@ impl<'t> Parser<'t> {
         })
     }
 
+    fn condition(&mut self, opening_message: &str) -> Result<Expr, ParseError> {
+        self.expect(TokenKind::LeftParen, opening_message)?;
+        let condition = self.expression()?;
+        self.expect(TokenKind::RightParen, "Expected \")\" after condition.")?;
+        Ok(condition)
+    }
+
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         let position = self.peek().position;
         match self.peek().kind {
             TokenKind::LeftBrace => Ok(Stmt::Block(self.block()?)),
+            TokenKind::If => {
+                self.advance();
+                let condition = self.condition("Expected \"(\" after \"if\".")?;
+                let then_branch = Box::new(self.statement()?);
+                let else_branch = if self.take(TokenKind::Else).is_some() {
+                    Some(Box::new(self.statement()?))
+                } else {
+                    None
+                };
+                Ok(Stmt::If {
+                    position,
+                    condition,
+                    then_branch,
+                    else_branch,
+                })
+            }
+            TokenKind::While => {
+                self.advance();
+                let condition = self.condition("Expected \"(\" after \"while\".")?;
+                let body = Box::new(self.statement()?);
+                Ok(Stmt::While {
+                    position,
+                    condition,
+                    body,
+                })
+            }
             TokenKind::Return => {
                 self.advance();
                 let value = if self.peek().kind == TokenKind::Semicolon {

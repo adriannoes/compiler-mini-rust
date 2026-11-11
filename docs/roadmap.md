@@ -67,8 +67,12 @@ The [scalar grammar](language.md#scalar-syntax) defines the input and output of 
 - [x] Record the grammar, positions, and error contract.
 - [x] Parse expressions, blocks, and functions without parameters. Print their trees.
 - [x] Parse declarations, parameters, and named calls.
-- [ ] Parse conditionals and loops. Compare scalar trees and errors with C++.
+- [x] Parse conditionals and loops. Compare scalar trees and errors with C++.
 - [ ] Work through FIRST and FOLLOW sets and a shift/reduce example.
+
+The Rust and C++ commands print identical trees for the 15 scalar reference programs.
+Both commands also agree on 169 binary operator pairs and 41 syntax errors from the C++ parser tests.
+The token command matches all 17 reference programs, including the two array programs.
 
 ## Execution contracts for later phases
 
