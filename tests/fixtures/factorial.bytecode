@@ -1,0 +1,46 @@
+bytecode
+function 0 "factorial" int parameters=1 @2:5
+  local 0 "n" int @2:19
+  constant 0 int "2"
+  constant 1 int "1"
+  constant 2 int "1"
+  0 STEP @2:22
+  1 STEP @3:3
+  2 STEP @3:9
+  3 STEP @3:7
+  4 LOAD_LOCAL 0 @3:7
+  5 STEP @3:11
+  6 LOAD_CONSTANT 0 @3:11
+  7 LESS @3:9
+  8 JUMP_IF_FALSE 13 @3:3
+  9 STEP @3:14
+  10 STEP @3:21
+  11 LOAD_CONSTANT 1 @3:21
+  12 RETURN @3:14
+  13 STEP @4:3
+  14 STEP @4:12
+  15 STEP @4:10
+  16 LOAD_LOCAL 0 @4:10
+  17 STEP @4:14
+  18 STEP @4:26
+  19 STEP @4:24
+  20 LOAD_LOCAL 0 @4:24
+  21 STEP @4:28
+  22 LOAD_CONSTANT 2 @4:28
+  23 SUBTRACT @4:26
+  24 CALL 0 @4:14
+  25 MULTIPLY @4:12
+  26 RETURN @4:3
+  27 UNREACHABLE @2:22
+end
+function 1 "main" int parameters=0 @6:5
+  constant 0 int "6"
+  0 STEP @6:12
+  1 STEP @7:3
+  2 STEP @7:10
+  3 STEP @7:20
+  4 LOAD_CONSTANT 0 @7:20
+  5 CALL 0 @7:10
+  6 RETURN @7:3
+  7 UNREACHABLE @6:12
+end

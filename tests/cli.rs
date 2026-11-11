@@ -221,7 +221,7 @@ fn type_check_is_silent_on_success_and_reports_a_position_on_failure() {
 
 #[test]
 fn analysis_and_run_commands_require_one_file_and_propagate_earlier_errors() {
-    for mode in ["--resolve", "--check", "--run"] {
+    for mode in ["--resolve", "--check", "--run", "--bytecode"] {
         for args in [&[mode][..], &[mode, "file", "extra"]] {
             let output = run(args);
             assert_eq!(output.status.code(), Some(1));
@@ -293,13 +293,56 @@ fn run_reports_static_entry_and_runtime_errors_without_output() {
 }
 
 #[test]
+fn bytecode_prints_the_reference_listings() {
+    for (name, expected) in [
+        (
+            "hello",
+            include_bytes!("fixtures/hello.bytecode").as_slice(),
+        ),
+        (
+            "calls",
+            include_bytes!("fixtures/calls.bytecode").as_slice(),
+        ),
+        (
+            "control_flow",
+            include_bytes!("fixtures/control_flow.bytecode").as_slice(),
+        ),
+        (
+            "short_circuit",
+            include_bytes!("fixtures/short_circuit.bytecode").as_slice(),
+        ),
+        (
+            "runtime_error",
+            include_bytes!("fixtures/runtime_error.bytecode").as_slice(),
+        ),
+        (
+            "factorial",
+            include_bytes!("fixtures/factorial.bytecode").as_slice(),
+        ),
+    ] {
+        let path = format!("examples/{name}.mc");
+        let output = run(&["--bytecode", &path]);
+        assert_eq!(output.status.code(), Some(0), "{path}");
+        assert_eq!(output.stdout, expected, "{path}");
+        assert!(output.stderr.is_empty(), "{path}");
+    }
+    for path in ["examples/expressions.mc", "examples/type_error.mc"] {
+        let check = run(&["--check", path]);
+        let dump = run(&["--bytecode", path]);
+        assert_eq!(dump.status.code(), Some(1));
+        assert!(dump.stdout.is_empty());
+        assert_eq!(dump.stderr, check.stderr);
+    }
+}
+
+#[test]
 fn help_lists_available_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n"
         );
         assert!(output.stderr.is_empty());
     }

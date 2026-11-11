@@ -1,0 +1,57 @@
+bytecode
+function 0 "main" bool parameters=0 @2:6
+  local 0 "ready" bool @3:8
+  constant 0 bool false
+  constant 1 bool false
+  constant 2 bool true
+  constant 3 bool false
+  constant 4 bool true
+  constant 5 int "1"
+  constant 6 int "0"
+  constant 7 int "0"
+  constant 8 bool true
+  0 STEP @2:13
+  1 STEP @3:8
+  2 RESET_LOCAL 0 @3:8
+  3 STEP @3:16
+  4 LOAD_CONSTANT 0 @3:16
+  5 STORE_LOCAL 0 @3:8
+  6 POP @3:8
+  7 STEP @4:3
+  8 STEP @4:9
+  9 STEP @4:3
+  10 LOAD_CONSTANT 1 @4:3
+  11 JUMP_IF_FALSE 17 @4:9
+  12 STEP @4:19
+  13 STEP @4:21
+  14 LOAD_CONSTANT 2 @4:21
+  15 STORE_LOCAL 0 @4:19
+  16 JUMP 18 @4:9
+  17 LOAD_CONSTANT 3 @4:9
+  18 POP @4:3
+  19 STEP @5:3
+  20 STEP @5:8
+  21 STEP @5:3
+  22 LOAD_CONSTANT 4 @5:3
+  23 JUMP_IF_TRUE 35 @5:8
+  24 STEP @5:18
+  25 STEP @5:14
+  26 STEP @5:12
+  27 LOAD_CONSTANT 5 @5:12
+  28 STEP @5:16
+  29 LOAD_CONSTANT 6 @5:16
+  30 DIVIDE @5:14
+  31 STEP @5:21
+  32 LOAD_CONSTANT 7 @5:21
+  33 EQUAL @5:18
+  34 JUMP 36 @5:8
+  35 LOAD_CONSTANT 8 @5:8
+  36 POP @5:3
+  37 STEP @6:3
+  38 STEP @6:10
+  39 STEP @6:11
+  40 LOAD_LOCAL 0 @6:11
+  41 NOT @6:10
+  42 RETURN @6:3
+  43 UNREACHABLE @2:13
+end

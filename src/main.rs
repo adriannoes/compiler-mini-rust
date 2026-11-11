@@ -7,9 +7,18 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use compiler_mini_rust::{Position, Value, check_types, interpret, lex, parse, resolve_names};
+use compiler_mini_rust::{
+    Position, Value, check_types, compile_bytecode, interpret, lex, parse, resolve_names,
+};
 
-const MODES: &[&str] = &["--tokens", "--ast", "--resolve", "--check", "--run"];
+const MODES: &[&str] = &[
+    "--tokens",
+    "--ast",
+    "--resolve",
+    "--check",
+    "--run",
+    "--bytecode",
+];
 
 enum CliError {
     Message(String),
@@ -100,6 +109,11 @@ fn run() -> Result<(), CliError> {
                 if value != Value::Void {
                     writeln!(output, "{value}")?;
                 }
+            }
+            "--bytecode" => {
+                let bytecode = compile_bytecode(&program)
+                    .map_err(|error| diagnostic(Some(error.position), error.to_string()))?;
+                write!(output, "{bytecode}")?;
             }
             "--check" => {
                 check_types(&program).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;
