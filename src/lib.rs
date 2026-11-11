@@ -1,6 +1,8 @@
 pub mod ast;
 mod bytecode;
+mod bytecode_compiler;
 pub use bytecode::BytecodeProgram;
+pub use bytecode_compiler::compile_bytecode;
 mod interpreter;
 mod lexer;
 mod parser;

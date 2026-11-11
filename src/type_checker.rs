@@ -22,7 +22,7 @@ impl fmt::Display for Type {
 }
 
 impl Type {
-    fn from_syntax(ty: TypeSyntax) -> Result<Self, AnalysisError> {
+    pub(crate) fn from_syntax(ty: TypeSyntax) -> Result<Self, AnalysisError> {
         match ty.keyword {
             TokenKind::Int => Ok(Self::Int),
             TokenKind::Bool => Ok(Self::Bool),
