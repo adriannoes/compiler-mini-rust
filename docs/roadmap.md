@@ -20,12 +20,12 @@ Both paths must agree on results, errors, and source positions.
 The [lexical contract](language.md) defines the token set, positions, and diagnostics before implementation.
 
 - [x] Record the contract and the [first program](../examples/return_42.mc).
-- [ ] Build the lexer library and test token ownership, positions, and errors.
+- [x] Build the lexer library and test token ownership, positions, and errors.
 - [ ] Add the token command and compare its output with the C++ executable.
 
-The scanner will borrow source bytes during a call. Each token will own its text.
+The scanner borrows source bytes during a call. Each token owns its text.
 This choice copies the lexeme but lets callers keep tokens after the source buffer expires.
-The library will return a typed error. The command will add the file path and print the diagnostic.
+The library returns a typed error. The command will add the file path and print the diagnostic.
 
 ## Execution contracts for later phases
 
