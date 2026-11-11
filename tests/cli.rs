@@ -1,6 +1,7 @@
+use std::ffi::OsStr;
 use std::process::{Command, Output};
 
-fn run(args: &[&str]) -> Output {
+fn run(args: &[impl AsRef<OsStr>]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_compiler-mini-rust"))
         .args(args)
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -67,6 +68,25 @@ fn missing_file_produces_a_file_diagnostic() {
         output.stderr,
         b"tests/fixtures/missing.mc: error: Cannot open file.\n"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn missing_file_diagnostics_preserve_each_unix_path() {
+    use std::os::unix::ffi::OsStrExt;
+
+    for path in [
+        b"tests/fixtures/missing-\xff.mc",
+        b"tests/fixtures/missing-\xfe.mc",
+    ] {
+        let output = run(&[OsStr::new("--tokens"), OsStr::from_bytes(path)]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            output.stderr,
+            [path.as_slice(), b": error: Cannot open file.\n"].concat()
+        );
+    }
 }
 
 #[test]

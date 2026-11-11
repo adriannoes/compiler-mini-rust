@@ -61,6 +61,7 @@ Unterminated block comment.
 
 The lexer quotes printable ASCII and escapes quotes and backslashes. It prints other unexpected bytes as two uppercase hexadecimal digits.
 Invalid arguments and file errors also produce a diagnostic on standard error and exit with status 1.
+On Unix, all four commands copy the original path bytes into file and source diagnostics. A path can contain bytes outside UTF-8.
 
 ## Scalar syntax
 
