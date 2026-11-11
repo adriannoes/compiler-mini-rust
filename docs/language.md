@@ -179,3 +179,64 @@ Argument count errors point to the callee. Argument type errors point to the arg
 A successful check exits with status 0 and prints nothing. Both analysis commands report the first error on standard error and exit with status 1.
 Standard output stays empty on failure. Neither command requires `main`.
 Execution handles initialization, literal range, and arithmetic errors. For example, `int f() { return 1 / 0; }` passes static analysis.
+
+## Scalar execution
+
+The `--run <file>` command checks the entire program before it selects the entry function.
+The command calls `main` without arguments. The library also accepts another entry name.
+An integer result prints in decimal. A boolean result prints as `true` or `false`.
+Each result line ends with a newline. A void result leaves standard output empty.
+Success returns status 0, including when the entry returns a nonzero integer.
+Failure returns status 1 and leaves standard output empty.
+
+### Integer operations
+
+Execution converts decimal digits only when it evaluates the literal. Leading zeroes do not change the base.
+Integers range from `-9223372036854775808` through `9223372036854775807`.
+A unary minus directly before a literal permits the minimum integer. Parentheses preserve this rule.
+For example, `-(0009223372036854775808)` evaluates to the minimum integer.
+
+Addition, subtraction, multiplication, and negation report overflow at the operator.
+Division truncates toward zero. A nonzero remainder has the sign of the dividend.
+Dividing the minimum integer by `-1` overflows. Taking its remainder with `-1` also overflows.
+
+### Evaluation order and storage
+
+A binary expression evaluates its left operand first.
+A false left operand of `&&` or a true left operand of `||` skips the right operand.
+Assignment evaluates its right operand, stores its value, and returns that value.
+An assignment can give a variable its first value.
+
+A declaration creates a slot before its initializer runs. In `int x = x;`, the read selects the new slot and fails.
+Each call evaluates its arguments in order in the caller. Each parameter receives a copy.
+A call has its own frame, including during direct or mutual recursion.
+Parameters and the outer function body share one environment.
+Each nested block creates an environment on entry, including each iteration of a loop with braces.
+
+An `if` evaluates its condition once and executes the selected branch.
+A `while` tests its condition before each iteration.
+A return exits the current function through any enclosing blocks, branches, or loops.
+A void function can return explicitly or reach the end of its body.
+Static analysis checks skipped code. Execution skips its effects and errors.
+
+### Execution limits and diagnostics
+
+The default budget permits 1,000,000 steps and 128 active calls. The entry counts as one call.
+Each statement and expression costs one step before execution. The function body counts as one block.
+A scalar assignment charges its expression and its right operand. The target name costs no separate step.
+Both the unary minus and its literal consume a step. Skipped nodes consume no steps.
+All calls share the step budget. Arguments finish before the call depth check.
+The library checks that both limits exceed zero before it analyzes the program.
+
+The command reports the first source error as `path:line:column: error: message` on standard error.
+
+| Failure | Source position | Message |
+|---------|-----------------|---------|
+| Missing entry | 1:1 | `The entry function "main" does not exist.` |
+| Entry with parameters | Entry declaration name | `The entry function "main" must not have parameters.` |
+| Uninitialized read | Name use | `The variable "x" has no value.` |
+| Literal outside the range | First digit, or unary minus for a negative literal | `The integer literal is outside the signed 64-bit range.` |
+| Arithmetic overflow | Operator | `Integer arithmetic exceeds the signed 64-bit range.` |
+| Zero divisor | Division or remainder operator | `The divisor is zero.` |
+| Step limit | Next statement or expression | `The execution step limit was reached.` |
+| Call depth limit | Function name at the call site | `The call depth limit was reached.` |
