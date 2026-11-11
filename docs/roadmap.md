@@ -8,7 +8,7 @@ Both paths must agree on results, errors, and source positions.
 |-------|-------------|-------------|--------|
 | 1 | Cargo package and first token command | Tokens, lexemes, and scanner states | Complete |
 | 2 | Complete lexer and diagnostic coverage | Finite automata, longest match, and operator boundaries | Complete |
-| 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | In progress |
+| 3 | Parser and abstract syntax tree (AST) | Recursive descent, precedence, FIRST and FOLLOW sets, and shift/reduce parsing | Complete |
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Pending |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Pending |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Pending |
@@ -68,11 +68,31 @@ The [scalar grammar](language.md#scalar-syntax) defines the input and output of 
 - [x] Parse expressions, blocks, and functions without parameters. Print their trees.
 - [x] Parse declarations, parameters, and named calls.
 - [x] Parse conditionals and loops. Compare scalar trees and errors with C++.
-- [ ] Work through FIRST and FOLLOW sets and a shift/reduce example.
+- [x] Work through FIRST and FOLLOW sets and a shift/reduce example.
 
 The Rust and C++ commands print identical trees for the 15 scalar reference programs.
 Both commands also agree on 169 binary operator pairs and 41 syntax errors from the C++ parser tests.
 The token command matches all 17 reference programs, including the two array programs.
+
+### Learning note
+
+The [parser](../src/parser.rs) uses recursive descent. Each statement handler selects a grammar rule from the next token.
+For binary expressions, the parser uses precedence climbing. The right operand accepts only operators with higher precedence.
+In `a + b * c`, multiplication enters the right operand of addition. A second `+` stays in the outer loop.
+Assignment parses its right operand recursively, so `a = b = c` groups as `a = (b = c)`.
+
+The parser finishes the entire `then` statement before it looks for an `else`.
+In `if (a) if (b) f(); else g();`, the inner call to the statement parser consumes the `else`.
+With braces around `if (b) f();`, the closing brace ends the inner block. The outer `if` then consumes the `else`.
+
+The [AST](../src/ast.rs) uses enums for alternative node shapes.
+A `Box` owns one child on the heap and gives the parent a fixed size. A `Vec` keeps sibling nodes in source order.
+A missing initializer, return value, or alternative branch uses `Option`.
+The parser copies identifier text and digit strings so the tree can outlive the tokens. Only recursive links that need indirection use a box.
+Scalar assignment stores a name and its position directly. This representation excludes invalid targets from the result.
+The parser returns the first positioned `ParseError`. The [printer](../src/ast/display.rs) receives a complete tree.
+
+The [parsing exercises](parsing.md) compare top-down decisions with a bottom-up trace for the same expression.
 
 ## Execution contracts for later phases
 
