@@ -4,8 +4,8 @@ use std::ops::ControlFlow;
 
 use crate::ast::{Block, Expr, ExprKind, Function, Name, NodeId, Program, Stmt};
 use crate::resolver::{SymbolId, SymbolKind};
-use crate::runtime::{self, ExecutionLimits, RuntimeError, Value};
-use crate::{AnalysisError, Position, Resolution, TokenKind, check_types};
+use crate::runtime::{self, ExecutionLimits, RuntimeError, Slot, Value};
+use crate::{AnalysisError, Position, TokenKind, TypeAnalysis, check_types};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
@@ -57,12 +57,6 @@ pub fn interpret_with_limits(
         return Err(InterpretError::InvalidLimits);
     }
     let analysis = check_types(program).map_err(InterpretError::Analysis)?;
-    if let Some(position) = analysis.first_array_position() {
-        return Err(InterpretError::Runtime(RuntimeError::new(
-            position,
-            "Array execution is not available.",
-        )));
-    }
     let function = program
         .functions
         .iter()
@@ -81,7 +75,7 @@ pub fn interpret_with_limits(
     }
     let mut interpreter = Interpreter {
         program,
-        resolution: analysis.resolution,
+        analysis,
         steps_left: limits.max_steps,
     };
     interpreter
@@ -89,7 +83,7 @@ pub fn interpret_with_limits(
         .map_err(InterpretError::Runtime)
 }
 
-type Environment = HashMap<SymbolId, Option<Value>>;
+type Environment = HashMap<SymbolId, Slot>;
 type Flow = ControlFlow<Value>;
 
 struct Frame {
@@ -105,14 +99,14 @@ impl Frame {
         }
     }
 
-    fn declare(&mut self, id: SymbolId, value: Option<Value>) {
+    fn declare(&mut self, id: SymbolId, value: Slot) {
         self.scopes
             .last_mut()
             .expect("Each frame has a function scope.")
             .insert(id, value);
     }
 
-    fn slot(&mut self, id: SymbolId) -> &mut Option<Value> {
+    fn slot(&mut self, id: SymbolId) -> &mut Slot {
         self.scopes
             .iter_mut()
             .rev()
@@ -121,9 +115,17 @@ impl Frame {
     }
 }
 
+impl Frame {
+    fn elements(&mut self, id: SymbolId) -> &mut [Option<Value>] {
+        self.slot(id)
+            .elements()
+            .expect("Type analysis requires an array at an indexed use.")
+    }
+}
+
 struct Interpreter<'p> {
     program: &'p Program,
-    resolution: Resolution,
+    analysis: TypeAnalysis,
     steps_left: usize,
 }
 
@@ -140,7 +142,7 @@ impl Interpreter<'_> {
             .ok_or_else(|| RuntimeError::new(call_site, "The call depth limit was reached."))?;
         let mut frame = Frame::new(calls_left);
         for (parameter, &value) in function.parameters.iter().zip(arguments) {
-            frame.declare(self.declaration(&parameter.name), Some(value));
+            frame.declare(self.declaration(&parameter.name), Slot::Scalar(Some(value)));
         }
         self.step(function.body.position)?;
         match self.block_contents(&mut frame, &function.body)? {
@@ -154,14 +156,16 @@ impl Interpreter<'_> {
     }
 
     fn binding(&self, id: NodeId) -> SymbolId {
-        self.resolution
+        self.analysis
+            .resolution
             .binding(id)
             .expect("Each name use has a binding.")
             .symbol
     }
 
     fn declaration(&self, name: &Name) -> SymbolId {
-        self.resolution
+        self.analysis
+            .resolution
             .declaration(name.id())
             .expect("Each declaration has a symbol.")
     }
@@ -188,10 +192,10 @@ impl Interpreter<'_> {
                 name, initializer, ..
             } => {
                 let id = self.declaration(name);
-                frame.declare(id, None);
+                frame.declare(id, Slot::empty(self.analysis.array_length(id)));
                 if let Some(expr) = initializer {
                     let value = self.expression(frame, expr)?;
-                    *frame.slot(id) = Some(value);
+                    *frame.slot(id) = Slot::Scalar(Some(value));
                 }
             }
             Stmt::Return { value, .. } => {
@@ -231,22 +235,56 @@ impl Interpreter<'_> {
         Ok(ControlFlow::Continue(()))
     }
 
+    fn index(
+        &mut self,
+        frame: &mut Frame,
+        id: SymbolId,
+        name: &str,
+        position: Position,
+        index: &Expr,
+    ) -> Result<usize, RuntimeError> {
+        let Value::Int(value) = self.expression(frame, index)? else {
+            unreachable!("Type analysis requires an integer index.");
+        };
+        runtime::element_offset(value, frame.elements(id).len(), name, position)
+    }
+
     fn expression(&mut self, frame: &mut Frame, expr: &Expr) -> Result<Value, RuntimeError> {
         let position = expr.position;
         self.step(position)?;
         match &expr.kind {
             ExprKind::Integer(digits) => runtime::integer(digits, false, position),
             ExprKind::Boolean(value) => Ok(Value::Bool(*value)),
-            ExprKind::Name(name) => frame.slot(self.binding(expr.id())).ok_or_else(|| {
-                RuntimeError::new(position, format!("The variable \"{name}\" has no value."))
-            }),
-            ExprKind::Index { .. } => {
-                unreachable!("Array declarations require array execution support.")
+            ExprKind::Name(name) => {
+                let Slot::Scalar(value) = frame.slot(self.binding(expr.id())) else {
+                    unreachable!("Type analysis requires a scalar at a name expression.");
+                };
+                value.ok_or_else(|| {
+                    RuntimeError::new(position, format!("The variable \"{name}\" has no value."))
+                })
             }
-            ExprKind::Assign { target, value, .. } => {
-                let value = self.expression(frame, value)?;
-                *frame.slot(self.binding(target.id())) = Some(value);
-                Ok(value)
+            ExprKind::Index { name, index } => {
+                let id = self.binding(expr.id());
+                let offset = self.index(frame, id, name, position, index)?;
+                runtime::read_element(frame.elements(id), offset, name, position)
+            }
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            } => {
+                let id = self.binding(target.id());
+                if let Some(index) = index {
+                    self.step(target.position)?;
+                    let offset = self.index(frame, id, &target.text, target.position, index)?;
+                    let value = self.expression(frame, value)?;
+                    frame.elements(id)[offset] = Some(value);
+                    Ok(value)
+                } else {
+                    let value = self.expression(frame, value)?;
+                    *frame.slot(id) = Slot::Scalar(Some(value));
+                    Ok(value)
+                }
             }
             ExprKind::Unary { op, operand } => {
                 if *op == TokenKind::Minus
@@ -271,6 +309,7 @@ impl Interpreter<'_> {
             }
             ExprKind::Call { arguments, .. } => {
                 let symbol = self
+                    .analysis
                     .resolution
                     .symbol(self.binding(expr.id()))
                     .expect("Each call has a symbol.");

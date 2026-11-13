@@ -19,6 +19,59 @@ impl fmt::Display for Value {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum Slot {
+    Scalar(Option<Value>),
+    Array(Vec<Option<Value>>),
+}
+
+impl Slot {
+    pub(crate) fn empty(length: Option<usize>) -> Self {
+        match length {
+            Some(n) => Self::Array(vec![None; n]),
+            None => Self::Scalar(None),
+        }
+    }
+
+    pub(crate) fn elements(&mut self) -> Option<&mut [Option<Value>]> {
+        match self {
+            Self::Array(values) => Some(values),
+            Self::Scalar(_) => None,
+        }
+    }
+}
+
+pub(crate) fn element_offset(
+    index: i64,
+    length: usize,
+    name: &str,
+    position: Position,
+) -> Result<usize, RuntimeError> {
+    usize::try_from(index)
+        .ok()
+        .filter(|&offset| offset < length)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                position,
+                format!("The array index {index} is outside \"{name}\" with length {length}."),
+            )
+        })
+}
+
+pub(crate) fn read_element(
+    elements: &[Option<Value>],
+    index: usize,
+    name: &str,
+    position: Position,
+) -> Result<Value, RuntimeError> {
+    elements[index].ok_or_else(|| {
+        RuntimeError::new(
+            position,
+            format!("The array element \"{name}[{index}]\" has no value."),
+        )
+    })
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct RuntimeError {
     pub position: Position,

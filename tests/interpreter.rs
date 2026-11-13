@@ -352,3 +352,82 @@ fn repeated_execution_owns_its_result_and_preserves_the_tree() {
     };
     assert_eq!(answer, Value::Int(42));
 }
+
+#[test]
+fn indexed_assignments_keep_the_address_across_calls_and_nested_writes() {
+    for (source, result) in [
+        (
+            "int main() { int a[2]; int i = 0; a[i] = (i = 1); return 10 * a[0] + i; }",
+            11,
+        ),
+        (
+            "int main() { int a[2]; int i = 0; a[i] = (a[i = 1] = 5); return 10 * a[0] + a[1] + i; }",
+            56,
+        ),
+        (
+            "int id(int n) { return n; } int main() { int a[2]; int i = 0; a[id(i = 1)] = id(i = 0); return a[1] + i; }",
+            0,
+        ),
+        (
+            "int sum(int n) { int a[2]; a[0] = n; if (n == 0) return a[0]; a[1] = sum(n - 1); return a[0] + a[1]; } int main() { return sum(10); }",
+            55,
+        ),
+        (include_str!("../examples/arrays.mc"), 10),
+    ] {
+        assert_eq!(run(source), Ok(Value::Int(result)), "{source}");
+    }
+}
+
+#[test]
+fn indexed_reads_and_writes_report_the_first_executed_error() {
+    runtime_error(
+        include_str!("../examples/array_error.mc"),
+        5,
+        10,
+        "The array element \"values[1]\" has no value.",
+    );
+    runtime_error(
+        "int main() { int a[1];\n  a[1] = 1 / 0; return 0; }",
+        2,
+        3,
+        "The array index 1 is outside \"a\" with length 1.",
+    );
+    runtime_error(
+        "int main() { int i = 0; while (i < 2) { int a[1]; if (i == 0) a[0] = 7; i = i + 1;\n  a[0]; } return 0; }",
+        2,
+        3,
+        "The array element \"a[0]\" has no value.",
+    );
+    runtime_error(
+        "int main() { int a[1];\n  return a[9223372036854775808]; }",
+        2,
+        12,
+        "The integer literal is outside the signed 64-bit range.",
+    );
+}
+
+#[test]
+fn an_indexed_target_costs_one_source_step_and_reset_costs_none() {
+    use compiler_mini_rust::{ExecutionLimits, interpret_with_limits};
+    let tree = program("int main() {\n  int a[1];\n  a[0] = 7;\n  return a[0];\n}");
+    let limits = |max_steps| ExecutionLimits {
+        max_steps,
+        max_call_depth: 1,
+    };
+    let error = interpret_with_limits(&tree, "main", limits(9)).unwrap_err();
+    assert_eq!(
+        error.position(),
+        Some(Position {
+            line: 4,
+            column: 12
+        })
+    );
+    assert_eq!(
+        interpret_with_limits(&tree, "main", limits(10)),
+        Ok(Value::Int(7))
+    );
+    assert_eq!(
+        interpret_with_limits(&program("void main() { int a[1024]; }"), "main", limits(2)),
+        Ok(Value::Void)
+    );
+}
