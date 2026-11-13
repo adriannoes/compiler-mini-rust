@@ -1,13 +1,13 @@
 use std::fmt;
 
-use crate::{Position, Type};
+use crate::{Position, RuntimeError, Type, Value, runtime};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BytecodeProgram {
     pub(crate) functions: Vec<BytecodeFunction>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BytecodeFunction {
     pub name: String,
     pub result: Type,
@@ -18,17 +18,37 @@ pub(crate) struct BytecodeFunction {
     pub code: Vec<Instruction>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Local {
     pub name: String,
     pub ty: Type,
     pub position: Position,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Constant {
     Integer { digits: String, negative: bool },
     Bool(bool),
+}
+
+impl Constant {
+    pub(crate) fn value(&self, position: Position) -> Result<Value, RuntimeError> {
+        match self {
+            Self::Integer { digits, negative } => runtime::integer(digits, *negative, position),
+            Self::Bool(b) => Ok(Value::Bool(*b)),
+        }
+    }
+
+    pub(crate) fn folded(value: Value) -> Self {
+        match value {
+            Value::Int(n) => Self::Integer {
+                digits: n.unsigned_abs().to_string(),
+                negative: n < 0,
+            },
+            Value::Bool(b) => Self::Bool(b),
+            Value::Void => unreachable!("Constant expressions have a scalar value."),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

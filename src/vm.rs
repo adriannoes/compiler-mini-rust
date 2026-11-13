@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::bytecode::{BytecodeFunction, BytecodeProgram, Constant, Op};
+use crate::bytecode::{BytecodeFunction, BytecodeProgram, Op};
 use crate::runtime;
 use crate::{ExecutionLimits, Position, RuntimeError, TokenKind, Type, Value};
 
@@ -97,13 +97,7 @@ pub fn execute_bytecode_with_limits(
                 let constant = frame.function.constants.get(index).ok_or(InvalidBytecode(
                     "The constant index is outside the function.",
                 ))?;
-                let value = match constant {
-                    Constant::Integer { digits, negative } => {
-                        runtime::integer(digits, *negative, position)?
-                    }
-                    Constant::Bool(b) => Value::Bool(*b),
-                };
-                stack.push(value);
+                stack.push(constant.value(position)?);
             }
             Op::ResetLocal(index) => *frame.slot(index)? = None,
             Op::LoadLocal(index) => {
@@ -270,7 +264,12 @@ fn require_type(value: Value, expected: Type) -> Result<(), VmError> {
     }
 }
 
-fn binary_value(op: Op, left: Value, right: Value, position: Position) -> Result<Value, VmError> {
+pub(crate) fn binary_value(
+    op: Op,
+    left: Value,
+    right: Value,
+    position: Position,
+) -> Result<Value, VmError> {
     let token = match op {
         Op::Add => TokenKind::Plus,
         Op::Subtract => TokenKind::Minus,
