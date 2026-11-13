@@ -68,12 +68,12 @@ fn assignment_preserves_its_target_and_groups_to_the_right() {
         panic!("Expected an expression.")
     };
     assert_eq!(position.column, 12);
-    let ExprKind::Assign { target, value } = &value.kind else {
+    let ExprKind::Assign { target, value, .. } = &value.kind else {
         panic!("Expected assignment.")
     };
     assert_eq!(target.text, "a");
     assert_eq!(target.position.column, 13);
-    let ExprKind::Assign { target, value } = &value.kind else {
+    let ExprKind::Assign { target, value, .. } = &value.kind else {
         panic!("Expected nested assignment.")
     };
     assert_eq!(target.text, "b");
@@ -152,6 +152,7 @@ fn calls_and_declarations_accept_syntactically_valid_types_and_names() {
         name,
         ty,
         initializer: Some(value),
+        ..
     } = &function.body.statements[0]
     else {
         panic!("Expected a variable with an initializer.")
@@ -190,14 +191,6 @@ fn lists_and_declarations_report_the_offending_token() {
             "Expected \";\" after expression. Received LEFT_PAREN.",
         ),
         ("int f() { g()\n= 1; }", "Expected a name before \"=\"."),
-        (
-            "int f() { int x\n[1]; }",
-            "Expected \";\" after declaration. Received LEFT_BRACKET.",
-        ),
-        (
-            "int f() { return x\n[0]; }",
-            "Expected \";\" after return value. Received LEFT_BRACKET.",
-        ),
     ] {
         let error = parse(&lex(source.as_bytes()).unwrap()).unwrap_err();
         assert_eq!(error.position, Position { line: 2, column: 1 }, "{source}");
@@ -315,5 +308,24 @@ fn input_tokens_require_a_final_eof() {
             parse(input).unwrap_err().message,
             "Expected tokens with a final EOF token."
         );
+    }
+}
+
+#[test]
+fn array_syntax_preserves_digits_and_rejects_unsupported_suffixes() {
+    let tree = program("void f() { int a[0000]; (a[true]) = 3; }");
+    assert!(tree.to_string().contains("Length \"0000\" @1:18"));
+    for source in [
+        "void f() { int a[]; }",
+        "void f() { int a[-1]; }",
+        "void f() { int a[1+1]; }",
+        "void f() { int a[2][3]; }",
+        "void f() { int a[2] = {1,2}; }",
+        "int f(int a[2]) { return 0; }",
+        "void f() { a[]; }",
+        "void f() { a[0][1]; }",
+        "void f() { a[0](1); }",
+    ] {
+        assert!(parse(&lex(source.as_bytes()).unwrap()).is_err(), "{source}");
     }
 }

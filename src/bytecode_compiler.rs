@@ -7,6 +7,12 @@ use crate::{AnalysisError, Position, TokenKind, Type, TypeAnalysis, check_types}
 
 pub fn compile_bytecode(program: &Program) -> Result<BytecodeProgram, AnalysisError> {
     let analysis = check_types(program)?;
+    if let Some(position) = analysis.first_array_position() {
+        return Err(AnalysisError {
+            position,
+            message: "Array bytecode is not available.".into(),
+        });
+    }
     let functions = program
         .functions
         .iter()
@@ -111,6 +117,7 @@ impl Compiler<'_> {
                 name,
                 ty,
                 initializer,
+                ..
             } => {
                 let slot = self.local(name, *ty);
                 self.emit(Op::ResetLocal(slot), position);
@@ -189,7 +196,10 @@ impl Compiler<'_> {
                     position,
                 );
             }
-            ExprKind::Assign { target, value } => {
+            ExprKind::Index { .. } => {
+                unreachable!("Array declarations require array bytecode support.")
+            }
+            ExprKind::Assign { target, value, .. } => {
                 self.expression(value);
                 self.emit(
                     Op::StoreLocal(self.slots[&self.binding(target.id())]),

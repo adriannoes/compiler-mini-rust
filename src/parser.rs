@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::ast::{Block, Expr, ExprKind, Function, Name, Parameter, Program, Stmt, TypeSyntax};
+use crate::ast::{
+    ArrayExtent, Block, Expr, ExprKind, Function, Name, Parameter, Program, Stmt, TypeSyntax,
+};
 use crate::{Position, Token, TokenKind};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -150,6 +152,25 @@ impl<'t> Parser<'t> {
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
         let ty = self.ty()?;
         let name = self.name("Expected a variable name.")?;
+        let extent = if self.take(TokenKind::LeftBracket).is_some() {
+            let token = self.expect(TokenKind::Integer, "Expected an integer array length.")?;
+            self.expect(
+                TokenKind::RightBracket,
+                "Expected \"]\" after array length.",
+            )?;
+            if self.peek().kind == TokenKind::Assign {
+                return Err(ParseError {
+                    position: self.peek().position,
+                    message: "Array initializers are not supported.".into(),
+                });
+            }
+            Some(ArrayExtent {
+                digits: token.text.clone(),
+                position: token.position,
+            })
+        } else {
+            None
+        };
         let initializer = if self.take(TokenKind::Assign).is_some() {
             Some(self.expression()?)
         } else {
@@ -160,6 +181,7 @@ impl<'t> Parser<'t> {
             name,
             ty,
             initializer,
+            extent,
         })
     }
 
@@ -227,17 +249,25 @@ impl<'t> Parser<'t> {
         let Some(equals) = self.take(TokenKind::Assign) else {
             return Ok(left);
         };
-        let ExprKind::Name(text) = left.kind else {
-            return Err(ParseError {
-                position: equals.position,
-                message: "Expected a name before \"=\".".to_owned(),
-            });
+        let (text, index) = match left.kind {
+            ExprKind::Name(name) => (name, None),
+            ExprKind::Index { name, index } => (name, Some(index)),
+            _ => {
+                return Err(ParseError {
+                    position: equals.position,
+                    message: "Expected a name before \"=\".".to_owned(),
+                });
+            }
         };
         let target = Name::new(text, left.position);
         let value = Box::new(self.expression()?);
         Ok(Expr::new(
             equals.position,
-            ExprKind::Assign { target, value },
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            },
         ))
     }
 
@@ -282,7 +312,11 @@ impl<'t> Parser<'t> {
             TokenKind::True | TokenKind::False => ExprKind::Boolean(token.kind == TokenKind::True),
             TokenKind::Identifier => {
                 let name = token.text.clone();
-                if self.take(TokenKind::LeftParen).is_some() {
+                if self.take(TokenKind::LeftBracket).is_some() {
+                    let index = Box::new(self.expression()?);
+                    self.expect(TokenKind::RightBracket, "Expected \"]\" after array index.")?;
+                    ExprKind::Index { name, index }
+                } else if self.take(TokenKind::LeftParen).is_some() {
                     let arguments = self.comma_list(Self::expression)?;
                     self.expect(TokenKind::RightParen, "Expected \")\" after arguments.")?;
                     ExprKind::Call { name, arguments }

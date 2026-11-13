@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::ast::{Block, Expr, ExprKind, NodeId, NodeMap, Program, Stmt, TypeSyntax};
-use crate::resolver::{Symbol, SymbolKind};
+use crate::resolver::{Symbol, SymbolId, SymbolKind};
 use crate::{AnalysisError, Position, Resolution, TokenKind, resolve_names};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,9 +61,22 @@ impl Type {
 pub struct TypeAnalysis {
     pub resolution: Resolution,
     types: NodeMap<Type>,
+    lengths: HashMap<SymbolId, usize>,
 }
 
 impl TypeAnalysis {
+    pub(crate) fn first_array_position(&self) -> Option<Position> {
+        self.lengths
+            .keys()
+            .filter_map(|id| self.resolution.symbol(*id))
+            .map(|symbol| symbol.position)
+            .min_by_key(|pos| (pos.line, pos.column))
+    }
+
+    pub fn array_length(&self, declaration: SymbolId) -> Option<usize> {
+        self.lengths.get(&declaration).copied()
+    }
+
     pub fn type_of(&self, id: NodeId) -> Option<Type> {
         self.types.get(id).copied()
     }
@@ -94,6 +108,7 @@ pub fn check_types(program: &Program) -> Result<TypeAnalysis, AnalysisError> {
         resolution: &resolution,
         signatures: &signatures,
         types: NodeMap::new(),
+        lengths: HashMap::new(),
     };
     for (function, signature) in program.functions.iter().zip(&signatures) {
         let returns = checker.block(&function.body, signature.result)?;
@@ -108,13 +123,19 @@ pub fn check_types(program: &Program) -> Result<TypeAnalysis, AnalysisError> {
         }
     }
     let types = checker.types;
-    Ok(TypeAnalysis { resolution, types })
+    let lengths = checker.lengths;
+    Ok(TypeAnalysis {
+        resolution,
+        types,
+        lengths,
+    })
 }
 
 struct Checker<'a> {
     resolution: &'a Resolution,
     signatures: &'a [Signature],
     types: NodeMap<Type>,
+    lengths: HashMap<SymbolId, usize>,
 }
 
 impl Checker<'_> {
@@ -125,14 +146,49 @@ impl Checker<'_> {
             .expect("Name resolution records a binding for each name use.")
     }
 
+    fn variable(
+        &mut self,
+        id: NodeId,
+        pos: Position,
+        index: Option<&Expr>,
+    ) -> Result<Type, AnalysisError> {
+        let symbol_id = self
+            .resolution
+            .binding(id)
+            .expect("Each variable use has a binding.")
+            .symbol;
+        let symbol = self.resolution.symbol(symbol_id).unwrap();
+        let ty = Type::from_syntax(symbol.ty)?;
+        match (self.lengths.contains_key(&symbol_id), index) {
+            (true, None) => Err(AnalysisError {
+                position: pos,
+                message: format!("Array \"{}\" requires an index.", symbol.name),
+            }),
+            (false, Some(_)) => Err(AnalysisError {
+                position: pos,
+                message: format!("Name \"{}\" does not refer to an array.", symbol.name),
+            }),
+            (true, Some(index)) => {
+                self.expression(index)?.require(Type::Int, index.position)?;
+                Ok(ty)
+            }
+            (false, None) => Ok(ty),
+        }
+    }
+
     fn expression(&mut self, expr: &Expr) -> Result<Type, AnalysisError> {
         let position = expr.position;
         let ty = match &expr.kind {
             ExprKind::Integer(_) => Type::Int,
             ExprKind::Boolean(_) => Type::Bool,
-            ExprKind::Name(_) => Type::from_syntax(self.symbol(expr.id()).ty)?,
-            ExprKind::Assign { target, value } => {
-                let ty = Type::from_syntax(self.symbol(target.id()).ty)?;
+            ExprKind::Name(_) => self.variable(expr.id(), position, None)?,
+            ExprKind::Index { index, .. } => self.variable(expr.id(), position, Some(index))?,
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            } => {
+                let ty = self.variable(target.id(), target.position, index.as_deref())?;
                 self.types.insert(target.id(), target.position, ty);
                 self.expression(value)?.require(ty, position)?;
                 ty
@@ -200,9 +256,31 @@ impl Checker<'_> {
         match stmt {
             Stmt::Block(block) => self.block(block, result),
             Stmt::Variable {
-                ty, initializer, ..
+                name,
+                ty,
+                initializer,
+                extent,
             } => {
                 let declared = Type::value_type(*ty)?;
+                if let Some(extent) = extent {
+                    let length = extent
+                        .digits
+                        .parse::<usize>()
+                        .ok()
+                        .filter(|n| (1..=1024).contains(n))
+                        .ok_or_else(|| AnalysisError {
+                            position: extent.position,
+                            message: "Array length must be from 1 through 1024.".into(),
+                        })?;
+                    if let Some(value) = initializer {
+                        return Err(AnalysisError {
+                            position: value.position,
+                            message: "Array initializers are not supported.".into(),
+                        });
+                    }
+                    let id = self.resolution.declaration(name.id()).unwrap();
+                    self.lengths.insert(id, length);
+                }
                 if let Some(expr) = initializer {
                     self.expression(expr)?.require(declared, expr.position)?;
                 }

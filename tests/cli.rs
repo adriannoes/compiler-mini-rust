@@ -411,3 +411,20 @@ fn optimized_listings_match_reference_files() {
         assert!(output.stderr.is_empty());
     }
 }
+
+#[test]
+fn array_syntax_names_and_types_match_the_reference() {
+    for (mode, expected) in [
+        ("--ast", include_bytes!("fixtures/arrays.ast").as_slice()),
+        (
+            "--resolve",
+            include_bytes!("fixtures/arrays.resolution").as_slice(),
+        ),
+        ("--check", b""),
+    ] {
+        let result = run(&[mode, "examples/arrays.mc"]);
+        assert_eq!(result.status.code(), Some(0));
+        assert!(result.stderr.is_empty());
+        assert_eq!(result.stdout, expected);
+    }
+}

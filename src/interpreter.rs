@@ -57,6 +57,12 @@ pub fn interpret_with_limits(
         return Err(InterpretError::InvalidLimits);
     }
     let analysis = check_types(program).map_err(InterpretError::Analysis)?;
+    if let Some(position) = analysis.first_array_position() {
+        return Err(InterpretError::Runtime(RuntimeError::new(
+            position,
+            "Array execution is not available.",
+        )));
+    }
     let function = program
         .functions
         .iter()
@@ -234,7 +240,10 @@ impl Interpreter<'_> {
             ExprKind::Name(name) => frame.slot(self.binding(expr.id())).ok_or_else(|| {
                 RuntimeError::new(position, format!("The variable \"{name}\" has no value."))
             }),
-            ExprKind::Assign { target, value } => {
+            ExprKind::Index { .. } => {
+                unreachable!("Array declarations require array execution support.")
+            }
+            ExprKind::Assign { target, value, .. } => {
                 let value = self.expression(frame, value)?;
                 *frame.slot(self.binding(target.id())) = Some(value);
                 Ok(value)

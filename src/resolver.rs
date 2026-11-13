@@ -278,6 +278,7 @@ impl<'p> Resolver<'p> {
                 name,
                 ty,
                 initializer,
+                ..
             } => {
                 self.declare(scope, name, SymbolKind::Variable, *ty)?;
                 if let Some(expr) = initializer {
@@ -316,7 +317,15 @@ impl<'p> Resolver<'p> {
             ExprKind::Name(name) => {
                 self.bind(scope, name, expr.id(), expr.position, UseKind::Read)?
             }
-            ExprKind::Assign { target, value } => {
+            ExprKind::Index { name, index } => {
+                self.bind(scope, name, expr.id(), expr.position, UseKind::Read)?;
+                self.expression(scope, index)?;
+            }
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            } => {
                 self.bind(
                     scope,
                     &target.text,
@@ -324,6 +333,9 @@ impl<'p> Resolver<'p> {
                     target.position,
                     UseKind::Write,
                 )?;
+                if let Some(index) = index {
+                    self.expression(scope, index)?;
+                }
                 self.expression(scope, value)?;
             }
             ExprKind::Call { name, arguments } => {

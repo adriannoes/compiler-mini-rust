@@ -71,6 +71,7 @@ impl TreePrinter<'_, '_> {
                 name,
                 ty,
                 initializer,
+                extent,
             } => {
                 self.node(
                     depth,
@@ -78,6 +79,13 @@ impl TreePrinter<'_, '_> {
                     name.position,
                 )?;
                 self.ty(depth + 1, ty)?;
+                if let Some(extent) = extent {
+                    self.node(
+                        depth + 1,
+                        format_args!("Length \"{}\"", extent.digits),
+                        extent.position,
+                    )?;
+                }
                 if let Some(initializer) = initializer {
                     self.expression(depth + 1, initializer)?;
                 }
@@ -126,6 +134,21 @@ impl TreePrinter<'_, '_> {
         }
     }
 
+    fn variable(
+        &mut self,
+        depth: usize,
+        name: &str,
+        pos: Position,
+        index: Option<&Expr>,
+    ) -> fmt::Result {
+        if let Some(index) = index {
+            self.node(depth, format_args!("Index \"{name}\""), pos)?;
+            self.expression(depth + 1, index)
+        } else {
+            self.node(depth, format_args!("Name \"{name}\""), pos)
+        }
+    }
+
     fn expression(&mut self, depth: usize, expr: &Expr) -> fmt::Result {
         let pos = expr.position;
         match &expr.kind {
@@ -133,7 +156,8 @@ impl TreePrinter<'_, '_> {
                 self.node(depth, format_args!("Integer \"{digits}\""), pos)
             }
             ExprKind::Boolean(value) => self.node(depth, format_args!("Boolean {value}"), pos),
-            ExprKind::Name(name) => self.node(depth, format_args!("Name \"{name}\""), pos),
+            ExprKind::Name(name) => self.variable(depth, name, pos, None),
+            ExprKind::Index { name, index } => self.variable(depth, name, pos, Some(index)),
             ExprKind::Call { name, arguments } => {
                 self.node(depth, format_args!("Call \"{name}\""), pos)?;
                 for argument in arguments {
@@ -150,13 +174,13 @@ impl TreePrinter<'_, '_> {
                 self.expression(depth + 1, left)?;
                 self.expression(depth + 1, right)
             }
-            ExprKind::Assign { target, value } => {
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            } => {
                 self.node(depth, "Assign", pos)?;
-                self.node(
-                    depth + 1,
-                    format_args!("Name \"{}\"", target.text),
-                    target.position,
-                )?;
+                self.variable(depth + 1, &target.text, target.position, index.as_deref())?;
                 self.expression(depth + 1, value)
             }
         }

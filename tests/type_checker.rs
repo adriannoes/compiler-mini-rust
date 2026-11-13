@@ -23,7 +23,7 @@ fn analysis_records_expression_types_targets_and_resolved_symbols() {
     let Stmt::Expression { value: assign, .. } = &block.statements[1] else {
         panic!("Expected an assignment.")
     };
-    let ExprKind::Assign { target, value } = &assign.kind else {
+    let ExprKind::Assign { target, value, .. } = &assign.kind else {
         panic!("Expected an assignment target.")
     };
     let ExprKind::Binary { left, right, .. } = &value.kind else {
@@ -67,6 +67,7 @@ fn joined_trees_keep_distinct_bindings_and_types_at_shared_positions() {
         let ExprKind::Assign {
             target,
             value: call,
+            ..
         } = &assign.kind
         else {
             panic!("Expected an assignment.");
@@ -300,4 +301,79 @@ fn only_structural_return_paths_satisfy_a_non_void_function() {
             "Function \"f\" does not guarantee a return value."
         );
     }
+}
+
+#[test]
+fn array_types_and_extents_belong_to_the_bound_declaration() {
+    let build = |s: &[u8]| parse(&lex(s).unwrap()).unwrap();
+    let mut tree = build(b"int f() {  int a[0001]; return a[0]; }");
+    tree.functions
+        .extend(build(b"bool g() {bool a[1024]; return a[0]; }").functions);
+    let analysis = check_types(&tree).unwrap();
+    for (function, (ty, length)) in tree
+        .functions
+        .iter()
+        .zip([(Type::Int, 1), (Type::Bool, 1024)])
+    {
+        let [
+            Stmt::Variable { name, .. },
+            Stmt::Return {
+                value: Some(read), ..
+            },
+        ] = &function.body.statements[..]
+        else {
+            panic!()
+        };
+        let symbol = analysis.resolution.declaration(name.id()).unwrap();
+        assert_eq!(
+            analysis.resolution.binding(read.id()).unwrap().symbol,
+            symbol
+        );
+        assert_eq!(analysis.array_length(symbol), Some(length));
+        assert_eq!(analysis.type_of(read.id()), Some(ty));
+        assert_eq!(analysis.type_at(read.position), None);
+    }
+}
+
+#[test]
+fn array_errors_identify_the_stage_and_the_source_position() {
+    for (statement, column, message) in [
+        ("int a[0];", 7, "Array length must be from 1 through 1024."),
+        (
+            "int a[1025];",
+            7,
+            "Array length must be from 1 through 1024.",
+        ),
+        (
+            "int a[999999999999999999999999];",
+            7,
+            "Array length must be from 1 through 1024.",
+        ),
+        (
+            "void a[1];",
+            1,
+            "Variables and parameters cannot have type void.",
+        ),
+        ("int a[1]; a;", 11, "Array \"a\" requires an index."),
+        ("int a; a[0];", 8, "Name \"a\" does not refer to an array."),
+        (
+            "int a[1]; a[true];",
+            13,
+            "Expected type int. Received bool.",
+        ),
+        (
+            "int a[1]; a[0] = false;",
+            16,
+            "Expected type int. Received bool.",
+        ),
+        ("int a[0]; missing;", 11, "Undeclared name \"missing\"."),
+    ] {
+        let error = check(&format!("void f() {{\n{statement}\n}}")).unwrap_err();
+        assert_eq!(
+            (error.position, error.message.as_str()),
+            (Position { line: 2, column }, message),
+            "{statement}"
+        );
+    }
+    check("void f() { int a[1]; { bool a; a = true; } a[0] = 3; }").unwrap();
 }

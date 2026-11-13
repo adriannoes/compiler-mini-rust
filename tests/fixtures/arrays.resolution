@@ -1,0 +1,30 @@
+Resolution
+  Scope #0 GLOBAL @1:1
+  Scope #1 FUNCTION parent=#0 @2:5
+  Scope #2 FUNCTION parent=#0 @6:5
+  Scope #3 BLOCK parent=#2 @11:21
+  Symbol #0 FUNCTION "next" scope=#0 @2:5
+  Symbol #1 FUNCTION "main" scope=#0 @6:5
+  Symbol #2 PARAMETER "value" scope=#1 @2:14
+  Symbol #3 VARIABLE "values" scope=#2 @7:7
+  Symbol #4 VARIABLE "flags" scope=#2 @8:8
+  Symbol #5 VARIABLE "index" scope=#2 @9:7
+  Symbol #6 VARIABLE "total" scope=#2 @10:7
+  Read "value" scope=#1 @3:10 -> Symbol #2 @2:14
+  Read "index" scope=#2 @11:10 -> Symbol #5 @9:7
+  Write "values" scope=#3 @12:5 -> Symbol #3 @7:7
+  Read "index" scope=#3 @12:12 -> Symbol #5 @9:7
+  Call "next" scope=#3 @12:21 -> Symbol #0 @2:5
+  Read "index" scope=#3 @12:26 -> Symbol #5 @9:7
+  Write "total" scope=#3 @13:5 -> Symbol #6 @10:7
+  Read "total" scope=#3 @13:13 -> Symbol #6 @10:7
+  Read "values" scope=#3 @13:21 -> Symbol #3 @7:7
+  Read "index" scope=#3 @13:28 -> Symbol #5 @9:7
+  Write "index" scope=#3 @14:5 -> Symbol #5 @9:7
+  Read "index" scope=#3 @14:13 -> Symbol #5 @9:7
+  Write "flags" scope=#2 @16:3 -> Symbol #4 @8:8
+  Write "flags" scope=#2 @17:3 -> Symbol #4 @8:8
+  Read "total" scope=#2 @17:14 -> Symbol #6 @10:7
+  Read "flags" scope=#2 @18:8 -> Symbol #4 @8:8
+  Read "flags" scope=#2 @18:20 -> Symbol #4 @8:8
+  Read "total" scope=#2 @18:37 -> Symbol #6 @10:7

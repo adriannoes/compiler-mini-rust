@@ -65,12 +65,19 @@ pub struct Block {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct ArrayExtent {
+    pub digits: String,
+    pub position: Position,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Stmt {
     Block(Block),
     Variable {
         name: Name,
         ty: TypeSyntax,
         initializer: Option<Expr>,
+        extent: Option<ArrayExtent>,
     },
     Return {
         position: Position,
@@ -140,6 +147,10 @@ pub enum ExprKind {
     Integer(String),
     Boolean(bool),
     Name(String),
+    Index {
+        name: String,
+        index: Box<Expr>,
+    },
     Call {
         name: String,
         arguments: Vec<Expr>,
@@ -155,6 +166,7 @@ pub enum ExprKind {
     },
     Assign {
         target: Name,
+        index: Option<Box<Expr>>,
         value: Box<Expr>,
     },
 }
