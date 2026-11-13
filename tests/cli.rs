@@ -221,7 +221,15 @@ fn type_check_is_silent_on_success_and_reports_a_position_on_failure() {
 
 #[test]
 fn analysis_and_run_commands_require_one_file_and_propagate_earlier_errors() {
-    for mode in ["--resolve", "--check", "--run", "--bytecode", "--run-vm"] {
+    for mode in [
+        "--resolve",
+        "--check",
+        "--run",
+        "--bytecode",
+        "--run-vm",
+        "--bytecode-opt",
+        "--run-vm-opt",
+    ] {
         for args in [&[mode][..], &[mode, "file", "extra"]] {
             let output = run(args);
             assert_eq!(output.status.code(), Some(1));
@@ -364,8 +372,42 @@ fn help_lists_available_commands() {
         assert_eq!(output.status.code(), Some(0));
         assert_eq!(
             output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n       compiler-mini-rust --run-vm <file>\n"
+            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n       compiler-mini-rust --run-vm <file>\n       compiler-mini-rust --bytecode-opt <file>\n       compiler-mini-rust --run-vm-opt <file>\n"
         );
+        assert!(output.stderr.is_empty());
+    }
+}
+
+#[test]
+fn optimized_listings_match_reference_files() {
+    for name in [
+        "hello",
+        "calls",
+        "control_flow",
+        "short_circuit",
+        "runtime_error",
+        "factorial",
+        "optimization",
+    ] {
+        let path = format!("examples/{name}.mc");
+        let output = run(&["--bytecode-opt", &path]);
+        assert!(output.status.success(), "{path}");
+        assert!(output.stderr.is_empty());
+        assert_eq!(
+            output.stdout,
+            std::fs::read(format!("tests/fixtures/{name}.optimized.bytecode")).unwrap(),
+            "{path}"
+        );
+    }
+    let path = "examples/optimization.mc";
+    assert_eq!(
+        run(&["--bytecode", path]).stdout,
+        include_bytes!("fixtures/optimization.bytecode")
+    );
+    for mode in ["--run", "--run-vm", "--run-vm-opt"] {
+        let output = run(&[mode, path]);
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"24\n");
         assert!(output.stderr.is_empty());
     }
 }

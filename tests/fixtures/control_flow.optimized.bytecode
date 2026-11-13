@@ -1,0 +1,63 @@
+bytecode
+function 0 "choose" int parameters=2 @2:5
+  local 0 "first" bool @2:17
+  local 1 "second" bool @2:29
+  local 2 "result" int @3:7
+  constant 0 int "0"
+  constant 1 int "1"
+  constant 2 int "2"
+  constant 3 int "3"
+  constant 4 int "1"
+  0 STEP @2:37
+  1 STEP @3:7
+  2 RESET_LOCAL 2 @3:7
+  3 STEP @3:16
+  4 LOAD_CONSTANT 0 @3:16
+  5 STORE_LOCAL 2 @3:7
+  6 POP @3:7
+  7 STEP @4:3
+  8 STEP @4:7
+  9 LOAD_LOCAL 0 @4:7
+  10 JUMP_IF_FALSE 28 @4:3
+  11 STEP @5:5
+  12 STEP @5:9
+  13 LOAD_LOCAL 1 @5:9
+  14 JUMP_IF_FALSE 22 @5:5
+  15 STEP @6:7
+  16 STEP @6:14
+  17 STEP @6:16
+  18 LOAD_CONSTANT 1 @6:16
+  19 STORE_LOCAL 2 @6:14
+  20 POP @6:7
+  21 JUMP 28 @5:5
+  22 STEP @8:7
+  23 STEP @8:14
+  24 STEP @8:16
+  25 LOAD_CONSTANT 2 @8:16
+  26 STORE_LOCAL 2 @8:14
+  27 POP @8:7
+  28 STEP @9:3
+  29 STEP @9:17
+  30 STEP @9:10
+  31 LOAD_LOCAL 2 @9:10
+  32 STEP @9:19
+  33 LOAD_CONSTANT 3 @9:19
+  34 LESS @9:17
+  35 JUMP_IF_FALSE 48 @9:3
+  36 STEP @9:22
+  37 STEP @10:5
+  38 STEP @10:12
+  39 STEP @10:21
+  40 STEP @10:14
+  41 LOAD_LOCAL 2 @10:14
+  42 STEP @10:23
+  43 LOAD_CONSTANT 4 @10:23
+  44 ADD @10:21
+  45 STORE_LOCAL 2 @10:12
+  46 POP @10:5
+  47 JUMP 29 @9:3
+  48 STEP @12:3
+  49 STEP @12:10
+  50 LOAD_LOCAL 2 @12:10
+  51 RETURN @12:3
+end

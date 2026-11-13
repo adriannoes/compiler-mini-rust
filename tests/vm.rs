@@ -1,7 +1,7 @@
 use compiler_mini_rust::ast::Program;
 use compiler_mini_rust::{
     ExecutionLimits, InterpretError, Value, VmError, compile_bytecode, execute_bytecode,
-    execute_bytecode_with_limits, interpret_with_limits, lex, parse,
+    execute_bytecode_with_limits, interpret_with_limits, lex, optimize_bytecode, parse,
 };
 
 fn program(source: &str) -> Program {
@@ -60,6 +60,7 @@ fn execution_matches_interpreter_values_errors_and_positions() {
         let tree = program(source);
         let code = compile_bytecode(&tree).unwrap();
         compare(&tree, &code, ExecutionLimits::default());
+        compare(&tree, &optimize_bytecode(&code), ExecutionLimits::default());
     }
 }
 
@@ -79,16 +80,15 @@ fn steps_and_call_depth_match_at_each_execution_boundary() {
     ] {
         let tree = program(source);
         let code = compile_bytecode(&tree).unwrap();
+        let optimized = optimize_bytecode(&code);
         for max_steps in 1..=80 {
             for max_call_depth in [1, 2, 4] {
-                compare(
-                    &tree,
-                    &code,
-                    ExecutionLimits {
-                        max_steps,
-                        max_call_depth,
-                    },
-                );
+                let limits = ExecutionLimits {
+                    max_steps,
+                    max_call_depth,
+                };
+                compare(&tree, &code, limits);
+                compare(&tree, &optimized, limits);
             }
         }
     }

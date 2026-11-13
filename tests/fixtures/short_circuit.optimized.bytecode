@@ -1,0 +1,32 @@
+bytecode
+function 0 "main" bool parameters=0 @2:6
+  local 0 "ready" bool @3:8
+  constant 0 bool false
+  constant 1 bool false
+  constant 2 bool true
+  constant 3 bool false
+  constant 4 bool true
+  constant 5 int "1"
+  constant 6 int "0"
+  constant 7 int "0"
+  constant 8 bool true
+  0 STEP @2:13
+  1 STEP @3:8
+  2 RESET_LOCAL 0 @3:8
+  3 STEP @3:16
+  4 LOAD_CONSTANT 0 @3:16
+  5 STORE_LOCAL 0 @3:8
+  6 POP @3:8
+  7 STEP @4:3
+  8 STEP @4:9
+  9 STEP @4:3
+  10 STEP @5:3
+  11 STEP @5:8
+  12 STEP @5:3
+  13 STEP @6:3
+  14 STEP @6:10
+  15 STEP @6:11
+  16 LOAD_LOCAL 0 @6:11
+  17 NOT @6:10
+  18 RETURN @6:3
+end

@@ -4,7 +4,14 @@ use crate::{TokenKind, Value, runtime, vm};
 pub fn optimize_bytecode(program: &BytecodeProgram) -> BytecodeProgram {
     let mut result = program.clone();
     for function in &mut result.functions {
-        local_rewrites(function);
+        loop {
+            let rewritten = local_rewrites(function);
+            let threaded = thread_jumps(&mut function.code);
+            let pruned = remove_unreachable(function);
+            if !(rewritten || threaded || pruned) {
+                break;
+            }
+        }
     }
     result
 }
@@ -78,6 +85,31 @@ fn local_rewrites(function: &mut BytecodeFunction) -> bool {
                 }
                 continue;
             }
+            Op::Pop if !known.is_empty() => {
+                edits[known.pop().unwrap().producer] = None;
+                edits[i] = None;
+                changed = true;
+                continue;
+            }
+            Op::JumpIfFalse(target) | Op::JumpIfTrue(target) if !known.is_empty() => {
+                let condition = known.pop().unwrap();
+                if let Value::Bool(value) = condition.value {
+                    edits[condition.producer] = None;
+                    edits[i] = (value == matches!(op, Op::JumpIfTrue(_))).then_some(Instruction {
+                        op: Op::Jump(target),
+                        position,
+                    });
+                    changed = true;
+                }
+                known.clear();
+                continue;
+            }
+            Op::Jump(target) if target == i + 1 => {
+                edits[i] = None;
+                known.clear();
+                changed = true;
+                continue;
+            }
             _ => {}
         }
         let folded = match (op, known.as_slice()) {
@@ -129,4 +161,55 @@ fn local_rewrites(function: &mut BytecodeFunction) -> bool {
         function.code = compact(edits);
     }
     changed
+}
+
+fn thread_jumps(code: &mut [Instruction]) -> bool {
+    let mut changed = false;
+    for i in 0..code.len() {
+        let Some(start) = code[i].op.jump_target() else {
+            continue;
+        };
+        let mut target = start;
+        while let Op::Jump(next) = code[target].op {
+            // Compiler-generated loop back edges lead to a source step.
+            if next == target {
+                break;
+            }
+            target = next;
+        }
+        if start != target {
+            *code[i].op.jump_target_mut().unwrap() = target;
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn remove_unreachable(function: &mut BytecodeFunction) -> bool {
+    let mut reachable = vec![false; function.code.len()];
+    let mut pending = vec![0];
+    while let Some(i) = pending.pop() {
+        if reachable[i] {
+            continue;
+        }
+        reachable[i] = true;
+        let op = function.code[i].op;
+        if let Some(target) = op.jump_target() {
+            pending.push(target);
+        }
+        if !op.terminal() && !matches!(op, Op::Jump(_)) {
+            pending.push(i + 1);
+        }
+    }
+    if reachable.iter().all(|&visited| visited) {
+        return false;
+    }
+    let edits = function
+        .code
+        .iter()
+        .zip(reachable)
+        .map(|(&inst, keep)| keep.then_some(inst))
+        .collect();
+    function.code = compact(edits);
+    true
 }
