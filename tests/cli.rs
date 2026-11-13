@@ -421,6 +421,17 @@ fn array_syntax_names_and_types_match_the_reference() {
             include_bytes!("fixtures/arrays.resolution").as_slice(),
         ),
         ("--check", b""),
+        (
+            "--bytecode",
+            include_bytes!("fixtures/arrays.bytecode").as_slice(),
+        ),
+        (
+            "--bytecode-opt",
+            include_bytes!("fixtures/arrays.optimized.bytecode").as_slice(),
+        ),
+        ("--run", b"10\n"),
+        ("--run-vm", b"10\n"),
+        ("--run-vm-opt", b"10\n"),
     ] {
         let result = run(&[mode, "examples/arrays.mc"]);
         assert_eq!(result.status.code(), Some(0));

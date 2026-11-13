@@ -22,6 +22,7 @@ pub(crate) struct BytecodeFunction {
 pub(crate) struct Local {
     pub name: String,
     pub ty: Type,
+    pub length: Option<usize>,
     pub position: Position,
 }
 
@@ -64,6 +65,9 @@ pub(crate) enum Op {
     LoadLocal(usize),
     StoreLocal(usize),
     ResetLocal(usize),
+    CheckIndex(usize),
+    LoadElement(usize),
+    StoreElement(usize),
     Pop,
     Negate,
     Not,
@@ -95,6 +99,9 @@ impl fmt::Display for Op {
             Self::LoadLocal(i) => return write!(out, "LOAD_LOCAL {i}"),
             Self::StoreLocal(i) => return write!(out, "STORE_LOCAL {i}"),
             Self::ResetLocal(i) => return write!(out, "RESET_LOCAL {i}"),
+            Self::CheckIndex(i) => return write!(out, "CHECK_INDEX {i}"),
+            Self::LoadElement(i) => return write!(out, "LOAD_ELEMENT {i}"),
+            Self::StoreElement(i) => return write!(out, "STORE_ELEMENT {i}"),
             Self::Pop => "POP",
             Self::Negate => "NEGATE",
             Self::Not => "NOT",
@@ -130,11 +137,11 @@ impl fmt::Display for BytecodeProgram {
                 function.name, function.result, function.parameters, function.position
             )?;
             for (slot, local) in function.locals.iter().enumerate() {
-                writeln!(
-                    out,
-                    "  local {slot} {:?} {} @{}",
-                    local.name, local.ty, local.position
-                )?;
+                write!(out, "  local {slot} {:?} {}", local.name, local.ty)?;
+                if let Some(length) = local.length {
+                    write!(out, "[{length}]")?;
+                }
+                writeln!(out, " @{}", local.position)?;
             }
             for (index, constant) in function.constants.iter().enumerate() {
                 match constant {

@@ -1,0 +1,141 @@
+bytecode
+function 0 "next" int parameters=1 @2:5
+  local 0 "value" int @2:14
+  constant 0 int "1"
+  0 STEP @2:21
+  1 STEP @3:3
+  2 STEP @3:16
+  3 STEP @3:10
+  4 LOAD_LOCAL 0 @3:10
+  5 STEP @3:18
+  6 LOAD_CONSTANT 0 @3:18
+  7 ADD @3:16
+  8 RETURN @3:3
+end
+function 1 "main" int parameters=0 @6:5
+  local 0 "values" int[4] @7:7
+  local 1 "flags" bool[2] @8:8
+  local 2 "index" int @9:7
+  local 3 "total" int @10:7
+  constant 0 int "0"
+  constant 1 int "0"
+  constant 2 int "4"
+  constant 3 int "1"
+  constant 4 int "0"
+  constant 5 bool false
+  constant 6 int "1"
+  constant 7 int "10"
+  constant 8 int "0"
+  constant 9 int "1"
+  constant 10 bool false
+  constant 11 int "0"
+  0 STEP @6:12
+  1 STEP @7:7
+  2 RESET_LOCAL 0 @7:7
+  3 STEP @8:8
+  4 RESET_LOCAL 1 @8:8
+  5 STEP @9:7
+  6 RESET_LOCAL 2 @9:7
+  7 STEP @9:15
+  8 LOAD_CONSTANT 0 @9:15
+  9 STORE_LOCAL 2 @9:7
+  10 POP @9:7
+  11 STEP @10:7
+  12 RESET_LOCAL 3 @10:7
+  13 STEP @10:15
+  14 LOAD_CONSTANT 1 @10:15
+  15 STORE_LOCAL 3 @10:7
+  16 POP @10:7
+  17 STEP @11:3
+  18 STEP @11:16
+  19 STEP @11:10
+  20 LOAD_LOCAL 2 @11:10
+  21 STEP @11:18
+  22 LOAD_CONSTANT 2 @11:18
+  23 LESS @11:16
+  24 JUMP_IF_FALSE 61 @11:3
+  25 STEP @11:21
+  26 STEP @12:5
+  27 STEP @12:19
+  28 STEP @12:5
+  29 STEP @12:12
+  30 LOAD_LOCAL 2 @12:12
+  31 CHECK_INDEX 0 @12:5
+  32 STEP @12:21
+  33 STEP @12:26
+  34 LOAD_LOCAL 2 @12:26
+  35 CALL 0 @12:21
+  36 STORE_ELEMENT 0 @12:5
+  37 POP @12:5
+  38 STEP @13:5
+  39 STEP @13:11
+  40 STEP @13:19
+  41 STEP @13:13
+  42 LOAD_LOCAL 3 @13:13
+  43 STEP @13:21
+  44 STEP @13:28
+  45 LOAD_LOCAL 2 @13:28
+  46 LOAD_ELEMENT 0 @13:21
+  47 ADD @13:19
+  48 STORE_LOCAL 3 @13:11
+  49 POP @13:5
+  50 STEP @14:5
+  51 STEP @14:11
+  52 STEP @14:19
+  53 STEP @14:13
+  54 LOAD_LOCAL 2 @14:13
+  55 STEP @14:21
+  56 LOAD_CONSTANT 3 @14:21
+  57 ADD @14:19
+  58 STORE_LOCAL 2 @14:11
+  59 POP @14:5
+  60 JUMP 18 @11:3
+  61 STEP @16:3
+  62 STEP @16:12
+  63 STEP @16:3
+  64 STEP @16:9
+  65 LOAD_CONSTANT 4 @16:9
+  66 CHECK_INDEX 1 @16:3
+  67 STEP @16:14
+  68 LOAD_CONSTANT 5 @16:14
+  69 STORE_ELEMENT 1 @16:3
+  70 POP @16:3
+  71 STEP @17:3
+  72 STEP @17:12
+  73 STEP @17:3
+  74 STEP @17:9
+  75 LOAD_CONSTANT 6 @17:9
+  76 CHECK_INDEX 1 @17:3
+  77 STEP @17:20
+  78 STEP @17:14
+  79 LOAD_LOCAL 3 @17:14
+  80 STEP @17:23
+  81 LOAD_CONSTANT 7 @17:23
+  82 EQUAL @17:20
+  83 STORE_ELEMENT 1 @17:3
+  84 POP @17:3
+  85 STEP @18:3
+  86 STEP @18:17
+  87 STEP @18:7
+  88 STEP @18:8
+  89 STEP @18:14
+  90 LOAD_CONSTANT 8 @18:14
+  91 LOAD_ELEMENT 1 @18:8
+  92 NOT @18:7
+  93 JUMP_IF_FALSE 99 @18:17
+  94 STEP @18:20
+  95 STEP @18:26
+  96 LOAD_CONSTANT 9 @18:26
+  97 LOAD_ELEMENT 1 @18:20
+  98 JUMP 100 @18:17
+  99 LOAD_CONSTANT 10 @18:17
+  100 JUMP_IF_FALSE 105 @18:3
+  101 STEP @18:30
+  102 STEP @18:37
+  103 LOAD_LOCAL 3 @18:37
+  104 RETURN @18:30
+  105 STEP @19:8
+  106 STEP @19:15
+  107 LOAD_CONSTANT 11 @19:15
+  108 RETURN @19:8
+end

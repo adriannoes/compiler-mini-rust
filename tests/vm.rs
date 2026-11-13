@@ -30,6 +30,14 @@ fn execution_matches_interpreter_values_errors_and_positions() {
     for source in [
         "",
         "void helper() {}",
+        "int main() { int a[2]; int i = 0; a[i] = (a[i = 1] = 5); return a[0] * 10 + a[1] + i; }",
+        "int f(int n) { return n; } int main() { int a[2]; int i = 1; a[f(i)] = f(i = 0); return a[1]; }",
+        "int main() { int a[1024]; a[0] = 3; a[1023] = 7; return a[0] + a[1023]; }",
+        "int main() { int a[1]; return a[-9223372036854775808]; }",
+        "int main() { int a[1]; return a[9223372036854775807]; }",
+        "int main() { int a[1]; return a[9223372036854775808]; }",
+        "int main() { int a[1]; a[0] = 3; { bool a[1]; a[0] = true; } return a[0]; }",
+        include_str!("../examples/array_error.mc"),
         "int main(int n) { return n; }",
         "int main() { int x; int y = x = 7; return x * 10 + y; }",
         "int main() { int x = 1; { x = x + 1; int x = 9; } return x; }",
@@ -67,6 +75,14 @@ fn execution_matches_interpreter_values_errors_and_positions() {
 #[test]
 fn steps_and_call_depth_match_at_each_execution_boundary() {
     for source in [
+        "int main() { int a[1]; a[0] = 7; return a[0]; }",
+        "int main() { int a[1]; a[0]; return 9; }",
+        "int f() { return 1; } int main() { int a[1]; a[-1] = f(); return 0; }",
+        "int main() { int a[2]; int i = 0; a[i] = (i = 1); return a[0]; }",
+        "int f(int n) { int a[1]; a[0] = n; if (n == 0) return a[0]; a[0] = a[0] + f(n - 1); return a[0]; } int main() { return f(3); }",
+        "void f() {} int main() { int a[1]; f(); a[0] = 1; return a[0]; }",
+        "int main() { int i = 0; while (i < 2) { int a[1]; if (i == 0) a[0] = 2; i = i + 1; a[0]; } return 0; }",
+        "bool main() { bool a[1]; false && a[0]; a[0] = true; return a[0] || a[-1]; }",
         "int main() { return 42; }",
         "int main() { int x; return x = -1; }",
         "bool main() { return true || (1 / 0 == 0); }",
@@ -141,4 +157,48 @@ fn functions_with_identical_source_positions_use_distinct_slots_and_calls() {
         execute_bytecode(&compile_bytecode(&tree).unwrap(), "main"),
         Ok(Value::Int(50))
     );
+}
+
+#[test]
+fn joined_trees_keep_distinct_array_lengths_and_bindings_in_every_engine() {
+    let mut tree = program("int f() { int a[1]; a[0] = 4; return a[0]; }");
+    tree.functions
+        .extend(program("int g() { int a[2]; a[1] = 6; return a[1]; }").functions);
+    tree.functions
+        .extend(program("int main() { return f() * 10 + g(); }").functions);
+    let input = compile_bytecode(&tree).unwrap();
+    let optimized = optimize_bytecode(&input);
+    for function in ["main", "f", "g", "main"] {
+        let expected = match function {
+            "f" => 4,
+            "g" => 6,
+            _ => 46,
+        };
+        assert_eq!(
+            compiler_mini_rust::interpret(&tree, function),
+            Ok(Value::Int(expected))
+        );
+        for code in [&input, &optimized] {
+            assert_eq!(execute_bytecode(code, function), Ok(Value::Int(expected)));
+        }
+    }
+}
+
+#[test]
+fn an_unused_element_read_still_fails_on_each_run() {
+    let code = compile_bytecode(&program("int main() { int a[1];\n  a[0]; return 7; }")).unwrap();
+    let optimized = optimize_bytecode(&code);
+    for input in [&code, &optimized] {
+        for _ in 0..2 {
+            let error = execute_bytecode(input, "main").unwrap_err();
+            assert_eq!(
+                error.position(),
+                Some(compiler_mini_rust::Position { line: 2, column: 3 })
+            );
+            assert_eq!(
+                error.to_string(),
+                "The array element \"a[0]\" has no value."
+            );
+        }
+    }
 }

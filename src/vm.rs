@@ -1,7 +1,8 @@
 use std::fmt;
 
-use crate::bytecode::{BytecodeFunction, BytecodeProgram, Op};
-use crate::runtime;
+use crate::bytecode::{BytecodeFunction, BytecodeProgram, Local, Op};
+use crate::runtime::{self, Slot};
+use crate::type_checker::MAX_ARRAY_LENGTH;
 use crate::{ExecutionLimits, Position, RuntimeError, TokenKind, Type, Value};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -99,7 +100,32 @@ pub fn execute_bytecode_with_limits(
                 ))?;
                 stack.push(constant.value(position)?);
             }
-            Op::ResetLocal(index) => *frame.slot(index)? = None,
+            Op::ResetLocal(index) => {
+                let length = frame.local(index)?.length;
+                if length.is_some_and(|n| !(1..=MAX_ARRAY_LENGTH).contains(&n)) {
+                    return Err(InvalidBytecode(
+                        "The array length is outside the supported range.",
+                    ));
+                }
+                frame.locals[index] = Slot::empty(length);
+            }
+            Op::CheckIndex(index) => {
+                frame.element(index, top(&stack, frame.base)?, position)?;
+            }
+            Op::LoadElement(index) => {
+                let subscript = pop(&mut stack, frame.base)?;
+                let name = &frame.local(index)?.name;
+                let (elements, offset) = frame.element(index, subscript, position)?;
+                stack.push(runtime::read_element(elements, offset, name, position)?);
+            }
+            Op::StoreElement(index) => {
+                let value = pop(&mut stack, frame.base)?;
+                let subscript = pop(&mut stack, frame.base)?;
+                require_type(value, frame.local(index)?.ty)?;
+                let (elements, offset) = frame.element(index, subscript, position)?;
+                elements[offset] = Some(value);
+                stack.push(value);
+            }
             Op::LoadLocal(index) => {
                 let value = frame.slot(index)?.ok_or_else(|| {
                     let name = &frame.function.locals[index].name;
@@ -109,13 +135,8 @@ pub fn execute_bytecode_with_limits(
             }
             Op::StoreLocal(index) => {
                 let value = top(&stack, frame.base)?;
-                let local = frame
-                    .function
-                    .locals
-                    .get(index)
-                    .ok_or(InvalidBytecode("The local index is outside the function."))?;
-                require_type(value, local.ty)?;
-                frame.locals[index] = Some(value);
+                require_type(value, frame.local(index)?.ty)?;
+                *frame.slot(index)? = Some(value);
             }
             Op::Pop => {
                 pop(&mut stack, frame.base)?;
@@ -190,7 +211,7 @@ struct Frame<'a> {
     function: &'a BytecodeFunction,
     pc: usize,
     base: usize,
-    locals: Vec<Option<Value>>,
+    locals: Vec<Slot>,
 }
 
 impl<'a> Frame<'a> {
@@ -211,10 +232,13 @@ impl<'a> Frame<'a> {
             .ok_or(InvalidBytecode(
                 "The call has insufficient argument values.",
             ))?;
-        let mut locals = vec![None; function.locals.len()];
+        let mut locals = vec![Slot::Scalar(None); function.locals.len()];
         for (i, value) in stack.drain(base..).enumerate() {
             require_type(value, function.locals[i].ty)?;
-            locals[i] = Some(value);
+            if function.locals[i].length.is_some() {
+                return Err(InvalidBytecode("Array parameters are not supported."));
+            }
+            locals[i] = Slot::Scalar(Some(value));
         }
         Ok(Self {
             function,
@@ -224,10 +248,41 @@ impl<'a> Frame<'a> {
         })
     }
 
-    fn slot(&mut self, index: usize) -> Result<&mut Option<Value>, VmError> {
-        self.locals
-            .get_mut(index)
+    fn local(&self, index: usize) -> Result<&'a Local, VmError> {
+        self.function
+            .locals
+            .get(index)
             .ok_or(InvalidBytecode("The local index is outside the function."))
+    }
+
+    fn slot(&mut self, index: usize) -> Result<&mut Option<Value>, VmError> {
+        if self.local(index)?.length.is_none()
+            && let Slot::Scalar(value) = &mut self.locals[index]
+        {
+            Ok(value)
+        } else {
+            Err(InvalidBytecode(
+                "A scalar instruction selected an array slot.",
+            ))
+        }
+    }
+
+    fn element(
+        &mut self,
+        slot: usize,
+        index: Value,
+        position: Position,
+    ) -> Result<(&mut [Option<Value>], usize), VmError> {
+        let local = self.local(slot)?;
+        let elements = self.locals[slot]
+            .elements()
+            .filter(|v| Some(v.len()) == local.length)
+            .ok_or(InvalidBytecode("The array slot has no active storage."))?;
+        let Value::Int(index) = index else {
+            return Err(InvalidBytecode("An array index must be an integer."));
+        };
+        let offset = runtime::element_offset(index, elements.len(), &local.name, position)?;
+        Ok((elements, offset))
     }
 
     fn jump(&mut self, target: usize) -> Result<(), VmError> {
@@ -302,6 +357,36 @@ pub(crate) fn binary_value(
 mod tests {
     use super::*;
     use crate::{compile_bytecode, lex, parse};
+
+    #[test]
+    fn invalid_array_slots_and_opcodes_return_vm_errors() {
+        let tree =
+            parse(&lex(b"int main() { int a[1]; a[0] = 7; return a[0]; }").unwrap()).unwrap();
+        let original = compile_bytecode(&tree).unwrap();
+        for op in [
+            Op::LoadLocal(0),
+            Op::StoreLocal(0),
+            Op::CheckIndex(99),
+            Op::StoreElement(99),
+        ] {
+            let mut program = original.clone();
+            let code = &mut program.functions[0].code;
+            code.iter_mut()
+                .find(|i| matches!(i.op, Op::CheckIndex(_)))
+                .unwrap()
+                .op = op;
+            assert!(matches!(
+                execute_bytecode(&program, "main"),
+                Err(VmError::InvalidBytecode(_))
+            ));
+        }
+        let mut program = original;
+        program.functions[0].locals[0].length = Some(MAX_ARRAY_LENGTH + 1);
+        assert!(matches!(
+            execute_bytecode(&program, "main"),
+            Err(VmError::InvalidBytecode(_))
+        ));
+    }
 
     #[test]
     fn executed_instructions_check_indices_stack_bounds_and_operand_types() {

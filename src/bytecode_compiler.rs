@@ -7,12 +7,6 @@ use crate::{AnalysisError, Position, TokenKind, Type, TypeAnalysis, check_types}
 
 pub fn compile_bytecode(program: &Program) -> Result<BytecodeProgram, AnalysisError> {
     let analysis = check_types(program)?;
-    if let Some(position) = analysis.first_array_position() {
-        return Err(AnalysisError {
-            position,
-            message: "Array bytecode is not available.".into(),
-        });
-    }
     let functions = program
         .functions
         .iter()
@@ -68,6 +62,7 @@ impl Compiler<'_> {
         self.slots.insert(id, index);
         self.function.locals.push(Local {
             name: name.text.clone(),
+            length: self.analysis.array_length(id),
             ty: Type::from_syntax(ty).expect("Type analysis checks local types."),
             position: name.position,
         });
@@ -196,15 +191,29 @@ impl Compiler<'_> {
                     position,
                 );
             }
-            ExprKind::Index { .. } => {
-                unreachable!("Array declarations require array bytecode support.")
-            }
-            ExprKind::Assign { target, value, .. } => {
-                self.expression(value);
+            ExprKind::Index { index, .. } => {
+                self.expression(index);
                 self.emit(
-                    Op::StoreLocal(self.slots[&self.binding(target.id())]),
+                    Op::LoadElement(self.slots[&self.binding(expr.id())]),
                     position,
                 );
+            }
+            ExprKind::Assign {
+                target,
+                index,
+                value,
+            } => {
+                let slot = self.slots[&self.binding(target.id())];
+                if let Some(index) = index {
+                    self.emit(Op::Step, target.position);
+                    self.expression(index);
+                    self.emit(Op::CheckIndex(slot), target.position);
+                    self.expression(value);
+                    self.emit(Op::StoreElement(slot), target.position);
+                } else {
+                    self.expression(value);
+                    self.emit(Op::StoreLocal(slot), position);
+                }
             }
             ExprKind::Call { arguments, .. } => {
                 for arg in arguments {

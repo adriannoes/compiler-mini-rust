@@ -5,6 +5,8 @@ use crate::ast::{Block, Expr, ExprKind, NodeId, NodeMap, Program, Stmt, TypeSynt
 use crate::resolver::{Symbol, SymbolId, SymbolKind};
 use crate::{AnalysisError, Position, Resolution, TokenKind, resolve_names};
 
+pub(crate) const MAX_ARRAY_LENGTH: usize = 1024;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
     Int,
@@ -65,14 +67,6 @@ pub struct TypeAnalysis {
 }
 
 impl TypeAnalysis {
-    pub(crate) fn first_array_position(&self) -> Option<Position> {
-        self.lengths
-            .keys()
-            .filter_map(|id| self.resolution.symbol(*id))
-            .map(|symbol| symbol.position)
-            .min_by_key(|pos| (pos.line, pos.column))
-    }
-
     pub fn array_length(&self, declaration: SymbolId) -> Option<usize> {
         self.lengths.get(&declaration).copied()
     }
@@ -267,7 +261,7 @@ impl Checker<'_> {
                         .digits
                         .parse::<usize>()
                         .ok()
-                        .filter(|n| (1..=1024).contains(n))
+                        .filter(|n| (1..=MAX_ARRAY_LENGTH).contains(n))
                         .ok_or_else(|| AnalysisError {
                             position: extent.position,
                             message: "Array length must be from 1 through 1024.".into(),
