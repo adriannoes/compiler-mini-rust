@@ -56,6 +56,19 @@ def write_inputs(work, name, cases):
     return paths
 
 
+def example_paths(rust_examples, reference_examples):
+    references = sorted(reference_examples.glob("*.mc"))
+    if not references:
+        raise ValueError(f"No .mc examples found in {reference_examples}.")
+    for reference in references:
+        local = rust_examples / reference.name
+        if not local.is_file():
+            raise ValueError(f"The Rust checkout has no copy of {reference.name}.")
+        if local.read_bytes() != reference.read_bytes():
+            raise ValueError(f"The reference and Rust copies of {reference.name} differ.")
+    return sorted(rust_examples.glob("*.mc"))
+
+
 def compare_fixtures(build_dir, executables, work):
     catalog = subprocess.check_output(["ctest", "--test-dir", build_dir, "--show-only=json-v1"])
     cases = [case for case in json.loads(catalog)["tests"] if case["name"].startswith("cli.")]
@@ -114,18 +127,12 @@ def compare_limits(work, paths):
 
 
 def validate(reference, work):
+    paths = example_paths(ROOT / "examples", reference / "examples")
     build(reference, work)
     cpp = work / "cpp"
     executables = [cpp / "reference" / "minic"]
     executables.extend(work / "rust" / p / "compiler-mini-rust" for p in PROFILES)
     programs = json.loads((HERE / "programs.json").read_text(encoding="ascii"))
-    examples = sorted((reference / "examples").glob("*.mc"))
-    if not examples:
-        raise ValueError(f"No .mc examples found in {reference / 'examples'}.")
-    for path in examples:
-        if path.read_bytes() != (ROOT / "examples" / path.name).read_bytes():
-            raise ValueError(f"The reference and Rust copies of {path.name} differ.")
-    paths = [ROOT / "examples" / path.name for path in examples]
     paths.extend(write_inputs(work, "cli", programs["cli"]))
     paths.append(ROOT / "examples")
     commands = [[mode, str(path)] for path in paths for mode in MODES]
