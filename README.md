@@ -162,3 +162,17 @@ cargo test
 
 The tests use the Rust standard library. Command tests check tokens, trees, name bindings, execution results, and diagnostics against expectations from C++.
 The [lexical contract](docs/language.md) specifies the supported tokens, positions, and diagnostics.
+
+### Compare with the C++ reference
+
+On Unix, the comparison requires Python 3, Make, CMake 3.20 or later, and a C++17 compiler in addition to Rust and Cargo.
+With both checkouts in the same parent directory, run this command from the Rust repository root.
+
+```sh
+python3 scripts/reference/compare.py ../compiler-mini-c
+```
+
+The argument selects the C++ source checkout. A system temporary directory holds both builds during the comparison.
+The script runs the CTest suite and the Rust tests in debug and release.
+It compares CLI output bytes, diagnostics, and exit status. It also compares the three engines at each step budget and call depth.
+If a comparison fails, the script exits with a nonzero status and reports the case.

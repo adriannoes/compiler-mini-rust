@@ -63,6 +63,9 @@ The lexer quotes printable ASCII and escapes quotes and backslashes. It prints o
 Invalid arguments and file errors also produce a diagnostic on standard error and exit with status 1.
 On Unix, the commands copy the original path bytes into file and source diagnostics. A path can contain bytes outside UTF-8.
 
+With no other arguments, `--help` and `-h` print the reference usage text to standard output and exit with status 0.
+The usage text calls the command `minic`. In this repository, `cargo run --quiet -- --help` prints that text.
+
 ## Syntax
 
 The parser groups tokens into an abstract syntax tree (AST). Each function owns its return type, name, parameters, and body.
@@ -232,6 +235,7 @@ An invalid limit returns `InterpretError::InvalidLimits` without a source positi
 The interpreter walks the AST on the native Rust stack. Deep syntax or a large custom call depth can exhaust that stack.
 
 If opening the input fails, the command reports `path: error: Cannot open file.`.
+If the command opens a directory, it processes an empty source. For example, `--check` succeeds and `--run` reports a missing entry at `1:1`.
 If reading the open input fails, the command reports `path: error: Cannot read file.`.
 The command reports the first source error as `path:line:column: error: message` on standard error.
 

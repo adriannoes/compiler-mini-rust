@@ -243,8 +243,28 @@ The [array example](../examples/arrays.mc) returns `10`. The [missing element](.
 All 91 Rust tests passed in debug and release builds.
 Both builds matched C++ on all nine commands for 17 reference programs and 36 additional inputs.
 They also matched 204 reference command cases on stdout bytes, stderr bytes, and exit status.
-Each executable uses its own help text. The directory input difference recorded in phase 5 remains outside these regular-file comparisons.
+That run excluded help and directory inputs. The phase 8 baseline below includes both.
 
 The [VM tests](../tests/vm.rs) cover 18 programs at 80 step budgets and three call depths.
 A separate comparison ran 15 programs at the same limits against all three C++ engines.
 Each Rust build matched the reference on 10,800 engine outcomes, including the first failing position.
+
+## Phase 8 preparation
+
+The [comparison command](../README.md#compare-with-the-c-reference) builds both projects and runs the suites from their source checkouts.
+The baseline used C++ commit `40f1984` on macOS. All 398 CTest cases passed. All 92 Rust tests passed in debug and release.
+
+| Comparison per Rust profile | Coverage |
+|---|---|
+| 488 direct CLI calls | Nine modes on 17 examples, 36 additional inputs, and one directory, plus both help flags |
+| 205 CTest CLI cases | Both output streams and the exit status, including the reference help fixture |
+| 3,600 execution limits | 15 programs, 80 step budgets, and three call depths across all three engines |
+
+The [comparison inputs](../scripts/reference/programs.json) include a failing discarded read, a write whose value changes its index, and an arithmetic overflow.
+A limit mismatch identifies the program, step budget, call depth, engine, and first differing result.
+
+### Phase 8 review
+
+- [ ] Review the grammar, instruction set, and execution limits against the implementation.
+- [ ] Run the documented examples and connect each supported feature or language limit to a test or an example.
+- [ ] Prepare the README for publication and repeat the comparison on the final revision.
