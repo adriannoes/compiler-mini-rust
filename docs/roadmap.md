@@ -13,7 +13,7 @@ Both paths must agree on results, errors, and source positions.
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Complete |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Complete |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Complete |
-| 8 | Review, tests, and publication documentation | Differential testing and language limits | Pending |
+| 8 | Review, tests, and publication documentation | Differential testing and language limits | Complete |
 
 ## Phase 1
 
@@ -263,8 +263,19 @@ The baseline used C++ commit `40f1984` on macOS. All 398 CTest cases passed. All
 The [comparison inputs](../scripts/reference/programs.json) include a failing discarded read, a write whose value changes its index, and an arithmetic overflow.
 A limit mismatch identifies the program, step budget, call depth, engine, and first differing result.
 
-### Phase 8 review
+## Phase 8
 
-- [ ] Review the grammar, instruction set, and execution limits against the implementation.
-- [ ] Run the documented examples and connect each supported feature or language limit to a test or an example.
-- [ ] Prepare the README for publication and repeat the comparison on the final revision.
+The [README](../README.md#language-features-and-limits) links language features and limits to examples or tests.
+The grammar matches the parser, and the [instruction table](language.md#bytecode-and-virtual-machine) covers all 29 VM instructions.
+The [execution rules](language.md#execution-limits-and-diagnostics) identify which error each library entry point returns for a zero limit.
+
+### Validation
+
+All 13 example commands in the README produced the documented results, including both expected errors.
+The final run used C++ commit `40f1984`. All 398 CTest cases passed. All 92 Rust tests passed in each profile.
+
+| Comparison per Rust profile | Result |
+|---|---|
+| Direct CLI calls | All 497 matched, including all nine modes on the Rust-only example [return_42.mc](../examples/return_42.mc). |
+| CTest CLI cases | All 205 matched on standard output, standard error, and exit status. |
+| Execution limits | All three engines matched C++ at all 3,600 combinations of program, step budget, and call depth. |

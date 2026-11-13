@@ -230,9 +230,15 @@ Each statement and expression costs one step before execution. The function body
 A scalar assignment charges its expression and its right operand. The target name costs no separate step.
 Both the unary minus and its literal consume a step. Skipped nodes consume no steps.
 All calls share the step budget. Arguments finish before the call depth check.
-The library checks that both limits exceed zero before it analyzes the program.
-An invalid limit returns `InterpretError::InvalidLimits` without a source position.
+
+Both library entry points require positive limits. If either limit is zero:
+
+- `interpret_with_limits` returns `InterpretError::InvalidLimits` before it checks names or types.
+- `execute_bytecode_with_limits` returns `VmError::InvalidLimits` before it looks for the entry function in the compiled bytecode.
+
+Neither error has a source position. Both report `Execution limits must be greater than zero.`
 The interpreter walks the AST on the native Rust stack. Deep syntax or a large custom call depth can exhaust that stack.
+The VM stores active calls in a vector.
 
 If opening the input fails, the command reports `path: error: Cannot open file.`.
 If the command opens a directory, it processes an empty source. For example, `--check` succeeds and `--run` reports a missing entry at `1:1`.

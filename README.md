@@ -8,7 +8,7 @@ The [roadmap](docs/roadmap.md) records the study phases.
 
 ## Run a program
 
-From the repository root, run the recursive [factorial example](examples/factorial.mc).
+Use a Rust toolchain that supports the 2024 edition. From the repository root, run the recursive [factorial example](examples/factorial.mc).
 
 ```sh
 cargo run --quiet -- --run examples/factorial.mc
@@ -138,6 +138,19 @@ The first command exits with status 0 and prints nothing. The second exits with 
 examples/type_error.mc:3:16: error: Expected type bool. Received int.
 ```
 
+## Language features and limits
+
+| Topic | Rule | Example or test |
+|---|---|---|
+| Source text | Identifiers use ASCII. The lexer skips comments and counts columns in bytes. | [Lexer tests](tests/lexer.rs) |
+| Expressions | Multiplication binds more tightly than addition. Assignment groups to the right. | [Expressions to inspect with `--ast`](examples/expressions.mc) |
+| Blocks and control flow | A block can hide an outer variable. An `else` belongs to the nearest open `if`. A `while` repeats while its condition is true. | [Scopes](examples/scopes.mc), [control flow](examples/control_flow.mc) |
+| Functions and types | Functions accept `int` or `bool` arguments by value and can call themselves. A non-void function must return a value on every path under the [return rules](docs/language.md#scalar-type-analysis). | [Factorial](examples/factorial.mc), [type tests](tests/type_checker.rs) |
+| Arithmetic and logic | Mini-C uses signed 64-bit integers. Overflow and division by zero fail at runtime. Logical operators skip the right operand when the left determines the result. | [Interpreter tests](tests/interpreter.rs), [short circuits](examples/short_circuit.mc) |
+| Local arrays | An array has one dimension and a fixed length of 1 through 1024. Each element needs a value before its first read. | [Array operations](examples/arrays.mc), [uninitialized element](examples/array_error.mc), [length limits](tests/type_checker.rs) |
+| Program entry and limits | Execution requires a parameterless entry. By default, all three engines allow 1,000,000 source steps and 128 active calls, including the entry. | [Entry tests](tests/interpreter.rs), [execution limits](tests/vm.rs) |
+| Bytecode and optimization | The VM executes stack instructions. Optimization can remove instructions but preserves results, errors, and source steps. | [Original and optimized code](examples/optimization.mc), [optimizer tests](tests/optimizer.rs) |
+
 ## Library and command
 
 The [lexer](src/lexer.rs) borrows the source bytes. Each [token](src/token.rs) owns its text, so callers can keep tokens after they release the source.
@@ -161,7 +174,7 @@ cargo test
 ```
 
 The tests use the Rust standard library. Command tests check tokens, trees, name bindings, execution results, and diagnostics against expectations from C++.
-The [lexical contract](docs/language.md) specifies the supported tokens, positions, and diagnostics.
+The [language reference](docs/language.md) specifies the grammar, diagnostics, and VM instructions.
 
 ### Compare with the C++ reference
 
@@ -174,5 +187,8 @@ python3 scripts/reference/compare.py ../compiler-mini-c
 
 The argument selects the C++ source checkout. A system temporary directory holds both builds during the comparison.
 The script runs the CTest suite and the Rust tests in debug and release.
-It compares CLI output bytes, diagnostics, and exit status. It also compares the three engines at each step budget and call depth.
+Each C++ example must have an identical copy in the Rust checkout.
+The script runs every Rust example through all nine modes in both implementations, including examples that exist only in Rust.
+It compares standard output and standard error byte for byte, along with the exit status.
+It also compares the three engines at each step budget and call depth.
 If a comparison fails, the script exits with a nonzero status and reports the case.
