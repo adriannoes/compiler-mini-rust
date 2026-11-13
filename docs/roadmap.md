@@ -12,7 +12,7 @@ Both paths must agree on results, errors, and source positions.
 | 4 | Name resolution and type analysis | Symbol tables, lexical scope, shadowing, and static types | Complete |
 | 5 | Interpreter with functions, control flow, and recursion | Environments, call frames, evaluation order, and checked arithmetic | Complete |
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Complete |
-| 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Pending |
+| 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Complete |
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Pending |
 
 ## Phase 1
@@ -62,7 +62,7 @@ A slash followed by `/` or `*` starts a comment. The scanner resumes token recog
 
 ## Phase 3
 
-The [scalar grammar](language.md#scalar-syntax) defines the input and output of the parser.
+The [grammar](language.md#syntax) defines the input and output of the parser.
 
 - [x] Record the grammar, positions, and error contract.
 - [x] Parse expressions, blocks, and functions without parameters. Print their trees.
@@ -212,7 +212,39 @@ The [VM tests](../tests/vm.rs) compare the VM with the interpreter on ten progra
 All 2,400 combinations agree on the value or the exact runtime error and position.
 With a configured limit of 6,000 calls, the VM returned through 5,002 active frames and completed the pending additions.
 
-## Execution contracts for later phases
+## Phase 7
 
-Local optimizations must preserve scalar values, evaluation order, source steps, and positioned errors.
-Each phase needs its own contract and approval before implementation.
+The [language contract](language.md#local-arrays) defines local arrays and bytecode optimization.
+
+- [x] Fold safe constants, simplify branches, and remap jump targets.
+- [x] Add local arrays to static analysis, the interpreter, and both VM modes.
+- [x] Compare the Rust engines with the C++ commands and execution limits.
+
+### Learning note
+
+The [optimizer](../src/bytecode_optimizer.rs) keeps the original bytecode so callers can inspect both listings.
+Keeping unused constants costs storage but avoids renumbering the original pool.
+A constant boolean can make one branch unreachable. A discarded read in a reachable branch can still fail.
+The optimizer preserves that read and each source step on the path to it.
+
+The length text belongs to the AST until type analysis checks it.
+A node identifier selects the binding for each use. A symbol identifier selects the declaration and its checked length.
+Distinct nodes can share a source position. Using that position as a lookup key can select the wrong array.
+Each call owns its slots. An array slot stores one optional scalar per element, so zero and false remain distinct from a missing value.
+
+The interpreter saves the target offset before evaluating an assignment value. The VM leaves the index below the value on its stack.
+In `a[i] = (i = 1)`, both engines write to the element that the original value of `i` selected.
+
+### Validation
+
+The [optimization example](../examples/optimization.mc) returns `24` in all three engines. Its listing shrinks from 69 instructions to 36.
+The [array example](../examples/arrays.mc) returns `10`. The [missing element](../examples/array_error.mc) fails at line 5, column 10.
+
+All 91 Rust tests passed in debug and release builds.
+Both builds matched C++ on all nine commands for 17 reference programs and 36 additional inputs.
+They also matched 204 reference command cases on stdout bytes, stderr bytes, and exit status.
+Each executable uses its own help text. The directory input difference recorded in phase 5 remains outside these regular-file comparisons.
+
+The [VM tests](../tests/vm.rs) cover 18 programs at 80 step budgets and three call depths.
+A separate comparison ran 15 programs at the same limits against all three C++ engines.
+Each Rust build matched the reference on 10,800 engine outcomes, including the first failing position.

@@ -23,7 +23,7 @@ The lexer reads source bytes from left to right. Each token has a kind, its orig
 | `EOF` | Empty text at the end of the input |
 
 The lexer reads a complete identifier before it tests for a keyword. For example, `int2` and `Return` are identifiers.
-An integer keeps all its digits, including leading zeroes. Only execution applies the signed 64-bit range to an integer value.
+An integer keeps all its digits, including leading zeroes. A literal outside the signed 64-bit range causes an error when execution reaches it.
 
 The lexer skips ASCII spaces, tabs, vertical tabs, form feeds, and line endings.
 A line comment starts with `//` and ends at a line ending or the end of input.
@@ -63,7 +63,7 @@ The lexer quotes printable ASCII and escapes quotes and backslashes. It prints o
 Invalid arguments and file errors also produce a diagnostic on standard error and exit with status 1.
 On Unix, the commands copy the original path bytes into file and source diagnostics. A path can contain bytes outside UTF-8.
 
-## Scalar syntax
+## Syntax
 
 The parser groups tokens into an abstract syntax tree (AST). Each function owns its return type, name, parameters, and body.
 A program can contain zero or more function definitions. Syntax permits a program without `main`.
@@ -77,7 +77,7 @@ type        = "int" | "bool" | "void" ;
 parameters  = parameter, { ",", parameter } ;
 parameter   = type, IDENTIFIER ;
 block       = "{", { declaration | statement }, "}" ;
-declaration = type, IDENTIFIER, [ "=", expression ], ";" ;
+declaration = type, IDENTIFIER, ( "[", INTEGER, "]" | [ "=", expression ] ), ";" ;
 statement   = block | "if", "(", expression, ")", statement, [ "else", statement ]
             | "while", "(", expression, ")", statement
             | "return", [ expression ], ";" | [ expression ], ";" ;
@@ -90,29 +90,30 @@ comparison  = sum, { ( "<" | "<=" | ">" | ">=" ), sum } ;
 sum         = product, { ( "+" | "-" ), product } ;
 product     = unary, { ( "*" | "/" | "%" ), unary } ;
 unary       = ( "!" | "-" ), unary | primary ;
-primary     = INTEGER | "true" | "false" | IDENTIFIER, [ "(", [ arguments ], ")" ]
+primary     = INTEGER | "true" | "false" | IDENTIFIER, [ "(", [ arguments ], ")" | "[", expression, "]" ]
             | "(", expression, ")" ;
 arguments   = expression, { ",", expression } ;
 ```
 
 Binary operators at the same level group to the left. Assignment and unary operators group to the right.
-Parentheses change grouping and leave no separate node. The left side of an assignment must reduce to a name.
+Parentheses change grouping and leave no separate node. The left side of an assignment must reduce to a name or an indexed name.
 The parser reports an invalid target at the equals sign. Integer nodes keep every decimal digit, including leading zeroes.
 A call requires a bare function name. Each parameter requires a type and a name.
 
 A declaration belongs directly to a block. The body of an `if` or `while` accepts one statement.
 An `else` belongs to the nearest open `if` unless a block closes that branch first.
-The parser accepts undeclared names and mixed types. Name resolution and type analysis belong to phase 4.
-Brackets remain valid tokens. Array declarations and indexed expressions belong to phase 7.
+The parser accepts undeclared names and mixed types. Name resolution and type analysis handle those errors.
+An index follows a bare name. The parser rejects a second index, an array initializer, and brackets on parameters.
 
 ## AST command
 
-Use `--ast <file>` to print the scalar syntax tree. The command completes lexing before parsing.
+Use `--ast <file>` to print the syntax tree. The command completes lexing before parsing.
 Each tree level adds two spaces. Each positioned node ends with `@line:column`.
 
 | Node | Source position |
 |------|-----------------|
 | Function, parameter, variable, name, call | Identifier |
+| Indexed use or array length | Array name or first digit of the length |
 | Type or literal | Keyword or literal |
 | Binary, unary, assignment | Operator |
 | Block or empty statement | Opening brace or semicolon |
@@ -247,7 +248,7 @@ The command reports the first source error as `path:line:column: error: message`
 
 ## Bytecode and virtual machine
 
-Use `--bytecode <file>` to compile scalar source and print its instructions.
+Use `--bytecode <file>` to compile Mini-C source and print its instructions.
 The compiler checks names and types in every function before it emits code.
 A successful command prints the complete listing and exits with status 0.
 An empty program prints `bytecode` and a newline. Compilation accepts functions with parameters and programs without `main`.
@@ -263,6 +264,9 @@ Instructions record the original source positions. Integer constants keep their 
 | `STEP` | Consume one source step before evaluating the next source node. |
 | `LOAD_CONSTANT` | Convert the selected constant and push its value. |
 | `RESET_LOCAL`, `LOAD_LOCAL`, `STORE_LOCAL` | Clear a slot, push its value, or copy the top value into the slot. A store retains the value on the stack. |
+| `CHECK_INDEX` | Check the bounds of the top index and keep it on the stack. |
+| `LOAD_ELEMENT` | Pop the index, check its bounds, and push the element value. |
+| `STORE_ELEMENT` | Pop the value and index, store the value, and push that value. |
 | `POP` | Discard the top value. |
 | `NEGATE`, `NOT` | Replace the top value with the unary result. |
 | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `REMAINDER` | Pop the right and left operands and push the checked integer result. |
@@ -279,3 +283,47 @@ The VM converts a literal when it executes `LOAD_CONSTANT`. Skipped literals and
 
 For example, `--bytecode examples/runtime_error.mc` succeeds. Its listing contains `RESET_LOCAL 0` followed by a read of that slot.
 With `--run-vm`, the read fails at line 3, column 15.
+
+## Local arrays
+
+A local declaration accepts one dimension and a decimal length, as in `bool flags[0002];`.
+The AST keeps the digits and their position. No expression supplies the length.
+Name resolution binds the indexed name first, then visits the index and any assignment value.
+Each declaration follows the same scope, duplicate name, and shadowing rules as a scalar.
+
+Type analysis accepts lengths from 1 through 1024. It reports an invalid length at its first digit.
+The element type must be `int` or `bool`. An index must have type `int`.
+An element can supply a scalar argument or return value. An entire array cannot supply either.
+An array name requires an index, and a scalar name cannot take one.
+These errors point to the name. An index type error points to the index expression.
+An incompatible assignment value produces a type error at the equals sign.
+
+Each call owns its local arrays. Each execution of the declaration clears every element, including on reentry to a loop block.
+The declaration costs one source step regardless of length. A read evaluates the index and requires a value at that element.
+Negative indices and indices at or above the length fail at the array name. A missing element value also fails there.
+An error within the index expression retains its own position.
+
+In `a[i] = expr`, execution first charges a step at the equals sign and a step at the target name.
+It evaluates `i` once and checks its bounds before it starts `expr`.
+It writes the result at the saved index and returns the value without reading the old element.
+A read also charges one step at the array name. Both forms charge the steps of the index expression.
+The VM lists a slot as `int[4]` or `bool[2]`. A call on the right preserves the saved index below its arguments.
+
+## Local bytecode optimization
+
+Use `--bytecode-opt <file>` to print optimized instructions. Use `--run-vm-opt <file>` to execute them.
+Both commands complete static analysis before optimization. The listing accepts a program without an entry.
+The library function `optimize_bytecode` returns an owned copy. All functions retain their order, signatures, and local slots.
+
+The optimizer tracks known stack values within each basic block, a sequence with one entry.
+It replaces constant operations only if literal conversion and the operation both succeed under the runtime rules.
+For example, `2 + 3` can become a load of `5`. A reachable `1 / 0` retains its division and diagnostic position.
+Each new integer constant uses decimal digits and a separate sign. The original constants retain their indices and spelling.
+Calls, local reads, writes, resets, and indexed operations end constant tracking.
+For example, discarding `a[0]` still reads the element and can report a missing value.
+
+A known condition selects one successor. An unknown condition retains both.
+The optimizer removes unreachable instructions within each function and updates absolute jump targets after compaction.
+It shortens chains of jumps and removes jumps to the next instruction. It repeats these operations until the listing stops changing.
+Every reachable `STEP` keeps its order and source position, including steps for expressions that now need fewer instructions.
+Short circuits skip the same operands. Calls evaluate their arguments before the depth limit applies.

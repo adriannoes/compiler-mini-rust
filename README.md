@@ -2,8 +2,8 @@
 
 This project implements Mini-C in Rust as a compiler study. The [C++ implementation](https://github.com/adriannoes/compiler-mini-c) provides the language rules and reference programs.
 The lexer separates source bytes into 35 kinds of tokens, including keywords, identifiers, operators, and the end of input.
-The parser builds an abstract syntax tree (AST) for scalar programs. Semantic analysis connects names to declarations and checks types.
-The interpreter executes the scalar AST. The bytecode compiler translates the same tree into instructions for a stack virtual machine (VM).
+The parser builds an abstract syntax tree (AST) for functions with scalars and local arrays. Semantic analysis connects names to declarations and checks types.
+The interpreter executes the AST. The bytecode compiler translates the same tree into instructions for a stack virtual machine (VM).
 The [roadmap](docs/roadmap.md) records the study phases.
 
 ## Run a program
@@ -42,6 +42,20 @@ cargo run --quiet -- --run-vm examples/factorial.mc
 The listing contains `CALL 0` for a call to `factorial`. The VM prints `720` and exits with status 0.
 Use [control_flow.mc](examples/control_flow.mc) to inspect a conditional jump and a backward loop jump.
 That file compiles on its own. Execution requires a `main` function.
+
+### Compare original and optimized instructions
+
+From the repository root, print both listings for the [optimization example](examples/optimization.mc).
+
+```sh
+cargo run --quiet -- --bytecode examples/optimization.mc
+cargo run --quiet -- --bytecode-opt examples/optimization.mc
+cargo run --quiet -- --run-vm-opt examples/optimization.mc
+```
+
+The optimizer reduces this program from 69 instructions to 36. All three execution modes print `24`.
+In the [array example](examples/arrays.mc), the loop stores four integers and sums them. All three modes print `10`.
+The [array error example](examples/array_error.mc) writes element zero and reads element one. The read fails at line 5, column 10.
 
 ## Inspect a program
 
@@ -91,7 +105,7 @@ Program
 
 Each child appears below its parent. The positions refer to the original source.
 Use [expressions.mc](examples/expressions.mc) to inspect precedence. Use [control_flow.mc](examples/control_flow.mc) to see which conditional owns an `else`.
-The [scalar grammar](docs/language.md#scalar-syntax) defines valid syntax. Array syntax belongs to phase 7.
+The [grammar](docs/language.md#syntax) defines declarations, calls, and indexed expressions.
 
 ### Inspect names and types
 
@@ -109,7 +123,7 @@ The output includes these two reads of `value`.
 ```
 
 Line 7 uses the declaration inside the nested block. Line 9 uses the outer declaration after the block ends.
-The source position on the left identifies the use. The position on the right identifies the declaration.
+The left position shows the use. The right position shows the declaration.
 
 Use `--check` to test a program against the [scalar type rules](docs/language.md#scalar-type-analysis).
 
@@ -133,6 +147,7 @@ The [resolver](src/resolver.rs) records a symbol for each read, write, and call.
 Call `interpret(&program, "main")` to execute the tree. Use `interpret_with_limits` to specify a step budget and a call depth limit.
 The [interpreter](src/interpreter.rs) returns an owned `Value` or an `InterpretError`.
 Call `compile_bytecode(&program)` to create an owned `BytecodeProgram`.
+Call `optimize_bytecode(&bytecode)` to obtain an independent optimized program.
 Call `execute_bytecode(&bytecode, "main")` to run it. Use `execute_bytecode_with_limits` to set the VM limits.
 The [instruction reference](docs/language.md#bytecode-and-virtual-machine) describes the listing and stack operations.
 The [command](src/main.rs) prints the result of the selected stage or adds the file path to its first diagnostic.
