@@ -1,0 +1,23 @@
+minic: Mini-C educational compiler
+
+Usage:
+  minic --help
+  minic --tokens <file>
+  minic --ast <file>
+  minic --resolve <file>
+  minic --check <file>
+  minic --bytecode <file>
+  minic --bytecode-opt <file>
+  minic --run <file>
+  minic --run-vm <file>
+  minic --run-vm-opt <file>
+
+Print token types, source text, and line:column positions.
+Use --ast to print the syntax tree.
+Use --resolve to print scopes, symbols, and name bindings.
+Use --check to analyze Mini-C types.
+Use --bytecode to print Mini-C instructions.
+Use --bytecode-opt to print optimized Mini-C instructions.
+Use --run to execute Mini-C programs.
+Use --run-vm to compile and execute Mini-C on the VM.
+Use --run-vm-opt to optimize and execute Mini-C on the VM.

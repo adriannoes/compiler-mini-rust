@@ -2,3 +2,4 @@ tests/fixtures/*.tokens text eol=lf
 tests/fixtures/*.ast text eol=lf
 tests/fixtures/*.bytecode text eol=lf
 tests/fixtures/*.resolution text eol=lf
+tests/fixtures/*.stdout text eol=lf

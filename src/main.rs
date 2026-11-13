@@ -12,16 +12,31 @@ use compiler_mini_rust::{
     optimize_bytecode, parse, resolve_names,
 };
 
-const MODES: &[&str] = &[
-    "--tokens",
-    "--ast",
-    "--resolve",
-    "--check",
-    "--run",
-    "--bytecode",
-    "--run-vm",
-    "--bytecode-opt",
-    "--run-vm-opt",
+const MODES: &[(&str, &str)] = &[
+    (
+        "--tokens",
+        "Print token types, source text, and line:column positions.",
+    ),
+    ("--ast", "Use --ast to print the syntax tree."),
+    (
+        "--resolve",
+        "Use --resolve to print scopes, symbols, and name bindings.",
+    ),
+    ("--check", "Use --check to analyze Mini-C types."),
+    ("--bytecode", "Use --bytecode to print Mini-C instructions."),
+    (
+        "--bytecode-opt",
+        "Use --bytecode-opt to print optimized Mini-C instructions.",
+    ),
+    ("--run", "Use --run to execute Mini-C programs."),
+    (
+        "--run-vm",
+        "Use --run-vm to compile and execute Mini-C on the VM.",
+    ),
+    (
+        "--run-vm-opt",
+        "Use --run-vm-opt to optimize and execute Mini-C on the VM.",
+    ),
 ];
 
 enum CliError {
@@ -67,13 +82,21 @@ fn run() -> Result<(), CliError> {
     let flag = flag.as_deref().and_then(OsStr::to_str);
     let path = args.next();
     if matches!(flag, Some("--help" | "-h")) && path.is_none() {
-        println!("Usage: compiler-mini-rust --tokens <file>");
-        for mode in &MODES[1..] {
-            println!("       compiler-mini-rust {mode} <file>");
+        let mut out = io::stdout().lock();
+        writeln!(
+            out,
+            "minic: Mini-C educational compiler\n\nUsage:\n  minic --help"
+        )?;
+        for (mode, _) in MODES {
+            writeln!(out, "  minic {mode} <file>")?;
+        }
+        writeln!(out)?;
+        for (_, description) in MODES {
+            writeln!(out, "{description}")?;
         }
         return Ok(());
     }
-    let known = flag.filter(|f| MODES.contains(f));
+    let known = flag.filter(|flag| MODES.iter().any(|(mode, _)| mode == flag));
     let (Some(mode), Some(path), None) = (known, path, args.next()) else {
         let expected = known.unwrap_or("--tokens");
         return Err(CliError::Message(format!(
@@ -88,8 +111,10 @@ fn run() -> Result<(), CliError> {
     };
     let mut file = File::open(path).map_err(|_| diagnostic(None, "Cannot open file.".into()))?;
     let mut source = Vec::new();
-    file.read_to_end(&mut source)
-        .map_err(|_| diagnostic(None, "Cannot read file.".into()))?;
+    let read_error = |_| diagnostic(None, "Cannot read file.".into());
+    if !file.metadata().map_err(read_error)?.is_dir() {
+        file.read_to_end(&mut source).map_err(read_error)?;
+    }
     let tokens = lex(&source).map_err(|e| diagnostic(Some(e.position), e.to_string()))?;
 
     let mut output = BufWriter::new(io::stdout().lock());

@@ -59,6 +59,33 @@ fn lexical_errors_have_positions_and_no_partial_output() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn an_open_directory_has_the_same_source_as_an_empty_file() {
+    for (mode, stdout) in [
+        ("--tokens", "1:1 EOF \"\"\n"),
+        ("--ast", "Program\n"),
+        ("--resolve", "Resolution\n  Scope #0 GLOBAL @1:1\n"),
+        ("--check", ""),
+        ("--bytecode", "bytecode\n"),
+        ("--bytecode-opt", "bytecode\n"),
+    ] {
+        let result = run(&[mode, "examples"]);
+        assert_eq!(result.status.code(), Some(0), "{mode}");
+        assert_eq!(result.stdout, stdout.as_bytes(), "{mode}");
+        assert!(result.stderr.is_empty(), "{mode}");
+    }
+    for mode in ["--run", "--run-vm", "--run-vm-opt"] {
+        let result = run(&[mode, "examples"]);
+        assert_eq!(result.status.code(), Some(1), "{mode}");
+        assert!(result.stdout.is_empty(), "{mode}");
+        assert_eq!(
+            result.stderr,
+            b"examples:1:1: error: The entry function \"main\" does not exist.\n"
+        );
+    }
+}
+
 #[test]
 fn missing_file_produces_a_file_diagnostic() {
     let output = run(&["--tokens", "tests/fixtures/missing.mc"]);
@@ -370,10 +397,7 @@ fn help_lists_available_commands() {
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
-        assert_eq!(
-            output.stdout,
-            b"Usage: compiler-mini-rust --tokens <file>\n       compiler-mini-rust --ast <file>\n       compiler-mini-rust --resolve <file>\n       compiler-mini-rust --check <file>\n       compiler-mini-rust --run <file>\n       compiler-mini-rust --bytecode <file>\n       compiler-mini-rust --run-vm <file>\n       compiler-mini-rust --bytecode-opt <file>\n       compiler-mini-rust --run-vm-opt <file>\n"
-        );
+        assert_eq!(output.stdout, include_bytes!("fixtures/help.stdout"));
         assert!(output.stderr.is_empty());
     }
 }
