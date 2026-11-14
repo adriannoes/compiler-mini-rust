@@ -2,6 +2,9 @@ use std::fmt;
 
 use crate::{Position, RuntimeError, Type, Value, runtime};
 
+#[cfg(test)]
+mod stack_analysis;
+
 #[derive(Debug, Clone)]
 pub struct BytecodeProgram {
     pub(crate) functions: Vec<BytecodeFunction>,
