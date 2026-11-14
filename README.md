@@ -5,7 +5,6 @@ The lexer separates source bytes into 35 kinds of tokens, including keywords, id
 The parser builds an abstract syntax tree (AST) for functions with scalars and local arrays. Semantic analysis connects names to declarations and checks types.
 The interpreter executes the AST. The bytecode compiler translates the same tree into instructions for a stack virtual machine (VM).
 The [roadmap](docs/roadmap.md) records the study phases.
-The [loop study](labs/loop-ir/README.md) traces one iteration in Mini-C bytecode and in the LLVM instructions that Rust generates.
 
 ## Run a program
 
@@ -57,6 +56,14 @@ cargo run --quiet -- --run-vm-opt examples/optimization.mc
 The optimizer reduces this program from 69 instructions to 36. All three execution modes print `24`.
 In the [array example](examples/arrays.mc), the loop stores four integers and sums them. All three modes print `10`.
 The [array error example](examples/array_error.mc) writes element zero and reads element one. The read fails at line 5, column 10.
+
+### Bytecode exercises
+
+| Question | Exercise |
+|---|---|
+| Where do the index and the running total come from on the next iteration? | [Trace one loop in Mini-C bytecode and Rust-generated LLVM IR.](labs/loop-ir/README.md#trace-one-iteration) |
+| Which jumps disappear when the optimizer folds a constant condition? | [Draw the control-flow graph before and after optimization.](docs/control-flow.md#predict-what-the-optimizer-removes) |
+| What must two paths agree on when they reach the same instruction? | [Trace the height of the operand stack](docs/stack-height.md) and [compare the types in each slot](docs/stack-height.md#trace-operand-types). |
 
 ## Inspect a program
 
