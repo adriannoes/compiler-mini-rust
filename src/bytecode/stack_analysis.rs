@@ -1,55 +1,138 @@
-use super::{BytecodeFunction, BytecodeProgram, Instruction, Op};
+use super::{BytecodeFunction, BytecodeProgram, Constant, Instruction, Op};
 use crate::{Type, compile_bytecode, lex, optimize_bytecode, parse};
 
-fn height_after(
+fn operand_base(height: usize, count: usize, op: Op) -> Result<usize, String> {
+    height
+        .checked_sub(count)
+        .ok_or_else(|| format!("{op} requires a stack height of at least {count}. Found {height}."))
+}
+
+fn replace_operands(
+    stack: &mut Vec<Type>,
     op: Op,
-    height: usize,
-    result_type: Type,
+    inputs: &[Type],
+    output: Option<Type>,
+) -> Result<(), String> {
+    let base = operand_base(stack.len(), inputs.len(), op)?;
+    for (index, (actual, expected)) in stack[base..].iter().zip(inputs).enumerate() {
+        if actual != expected {
+            let number = index + 1;
+            return Err(format!(
+                "{op} expects {expected} for operand {number}. Found {actual}."
+            ));
+        }
+    }
+    stack.truncate(base);
+    stack.extend(output);
+    Ok(())
+}
+
+fn slot_type(function: &BytecodeFunction, index: usize, array: bool) -> Result<Type, String> {
+    let slot = function
+        .locals
+        .get(index)
+        .ok_or_else(|| format!("Local slot {index} is outside the function."))?;
+    if slot.length.is_some() != array {
+        let kind = if array { "an array" } else { "a scalar" };
+        return Err(format!(
+            "This instruction requires {kind} at local slot {index}."
+        ));
+    }
+    if slot.ty == Type::Void {
+        return Err(format!("Local slot {index} has type void."));
+    }
+    Ok(slot.ty)
+}
+
+fn apply_instruction(
+    op: Op,
+    stack: &mut Vec<Type>,
+    function: &BytecodeFunction,
     program: &BytecodeProgram,
-) -> Result<usize, String> {
-    let (inputs, outputs) = match op {
-        Op::Step | Op::ResetLocal(_) | Op::Jump(_) => (0, 0),
-        Op::LoadConstant(_) | Op::LoadLocal(_) => (0, 1),
-        Op::Pop | Op::JumpIfFalse(_) | Op::JumpIfTrue(_) => (1, 0),
-        Op::StoreLocal(_) | Op::CheckIndex(_) | Op::LoadElement(_) | Op::Negate | Op::Not => (1, 1),
-        Op::StoreElement(_)
-        | Op::Add
-        | Op::Subtract
-        | Op::Multiply
-        | Op::Divide
-        | Op::Remainder
-        | Op::Equal
-        | Op::NotEqual
-        | Op::Less
-        | Op::LessEqual
-        | Op::Greater
-        | Op::GreaterEqual => (2, 1),
+) -> Result<(), String> {
+    use Type::{Bool, Int};
+
+    match op {
+        Op::Step | Op::ResetLocal(_) | Op::Jump(_) => Ok(()),
+        Op::LoadConstant(index) => {
+            let constant = function
+                .constants
+                .get(index)
+                .ok_or_else(|| format!("Constant index {index} is outside the function."))?;
+            stack.push(match constant {
+                Constant::Integer { .. } => Int,
+                Constant::Bool(_) => Bool,
+            });
+            Ok(())
+        }
+        Op::LoadLocal(index) => {
+            stack.push(slot_type(function, index, false)?);
+            Ok(())
+        }
+        Op::StoreLocal(index) => {
+            let ty = slot_type(function, index, false)?;
+            replace_operands(stack, op, &[ty], Some(ty))
+        }
+        Op::CheckIndex(index) => {
+            slot_type(function, index, true)?;
+            replace_operands(stack, op, &[Int], Some(Int))
+        }
+        Op::LoadElement(index) => {
+            let ty = slot_type(function, index, true)?;
+            replace_operands(stack, op, &[Int], Some(ty))
+        }
+        Op::StoreElement(index) => {
+            let ty = slot_type(function, index, true)?;
+            replace_operands(stack, op, &[Int, ty], Some(ty))
+        }
+        Op::Pop => {
+            stack.truncate(operand_base(stack.len(), 1, op)?);
+            Ok(())
+        }
+        Op::Negate => replace_operands(stack, op, &[Int], Some(Int)),
+        Op::Not => replace_operands(stack, op, &[Bool], Some(Bool)),
+        Op::Add | Op::Subtract | Op::Multiply | Op::Divide | Op::Remainder => {
+            replace_operands(stack, op, &[Int, Int], Some(Int))
+        }
+        Op::Less | Op::LessEqual | Op::Greater | Op::GreaterEqual => {
+            replace_operands(stack, op, &[Int, Int], Some(Bool))
+        }
+        Op::Equal | Op::NotEqual => {
+            let base = operand_base(stack.len(), 2, op)?;
+            let ty = stack[base];
+            replace_operands(stack, op, &[ty, ty], Some(Bool))
+        }
+        Op::JumpIfTrue(_) | Op::JumpIfFalse(_) => replace_operands(stack, op, &[Bool], None),
         Op::Call(index) => {
             let callee = program
                 .functions
                 .get(index)
                 .ok_or_else(|| format!("Function index {index} is outside the program."))?;
-            (callee.parameters, usize::from(callee.result != Type::Void))
+            let inputs = (0..callee.parameters)
+                .map(|i| slot_type(callee, i, false))
+                .collect::<Result<Vec<_>, _>>()?;
+            let output = (callee.result != Type::Void).then_some(callee.result);
+            replace_operands(stack, op, &inputs, output)
         }
         Op::Return | Op::ReturnVoid => {
             let returns_value = matches!(op, Op::Return);
-            if returns_value != (result_type != Type::Void) {
+            if returns_value != (function.result != Type::Void) {
                 return Err("The return instruction does not match the function signature.".into());
             }
             let expected = usize::from(returns_value);
+            let height = stack.len();
             if height != expected {
                 return Err(format!(
                     "{op} requires stack height {expected}. Found {height}."
                 ));
             }
-            return Ok(0);
+            if returns_value {
+                replace_operands(stack, op, &[function.result], None)?;
+            }
+            Ok(())
         }
-        Op::Unreachable => return Err("Control flow reaches UNREACHABLE.".into()),
-    };
-    let remaining = height.checked_sub(inputs).ok_or_else(|| {
-        format!("{op} requires a stack height of at least {inputs}. Found {height}.")
-    })?;
-    Ok(remaining + outputs)
+        Op::Unreachable => Err("Control flow reaches UNREACHABLE.".into()),
+    }
 }
 
 fn maximum_stack_height(
@@ -63,15 +146,19 @@ fn maximum_stack_height(
     let Some(entry) = incoming.first_mut() else {
         return Err(error(0, "The function has no entry instruction."));
     };
-    *entry = Some(0);
-    let mut pending = vec![(0, 0)];
+    *entry = Some(Vec::new());
+    let mut pending = vec![0];
     let mut peak = 0;
 
-    while let Some((offset, height)) = pending.pop() {
+    while let Some(offset) = pending.pop() {
+        let mut stack = incoming[offset]
+            .as_ref()
+            .expect("Each pending instruction has an incoming stack.")
+            .clone();
         let op = function.code[offset].op;
-        let next_height = height_after(op, height, function.result, program)
+        apply_instruction(op, &mut stack, function, program)
             .map_err(|message| error(offset, &message))?;
-        peak = peak.max(next_height);
+        peak = peak.max(stack.len());
 
         let next = Some(offset + 1);
         let successors = match op {
@@ -87,20 +174,29 @@ fn maximum_stack_height(
                     &format!("Successor {target} is outside the function."),
                 )
             })?;
-            match *slot {
-                Some(previous) if previous != next_height => {
+            if let Some(previous) = slot {
+                if previous.len() != stack.len() {
                     return Err(error(
                         target,
                         &format!(
-                            "Paths reach this instruction with stack heights {previous} and {next_height}."
+                            "Paths reach this instruction with stack heights {} and {}.",
+                            previous.len(),
+                            stack.len()
                         ),
                     ));
                 }
-                Some(_) => {}
-                None => {
-                    *slot = Some(next_height);
-                    pending.push((target, next_height));
+                if let Some(index) = previous.iter().zip(&stack).position(|(a, b)| a != b) {
+                    return Err(error(
+                        target,
+                        &format!(
+                            "Paths supply {} and {} at stack slot {index}.",
+                            previous[index], stack[index]
+                        ),
+                    ));
                 }
+            } else {
+                *slot = Some(stack.clone());
+                pending.push(target);
             }
         }
     }
@@ -109,6 +205,38 @@ fn maximum_stack_height(
 
 fn compile(source: &[u8]) -> BytecodeProgram {
     compile_bytecode(&parse(&lex(source).unwrap()).unwrap()).unwrap()
+}
+
+#[test]
+fn compiled_examples_have_valid_operand_types_before_and_after_optimization() {
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+    for entry in std::fs::read_dir(examples).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("mc") {
+            continue;
+        }
+        let source = std::fs::read(&path).unwrap();
+        let tree = parse(&lex(&source).unwrap()).unwrap();
+        let result = compile_bytecode(&tree);
+        if matches!(
+            path.file_name().and_then(|n| n.to_str()),
+            Some("expressions.mc" | "type_error.mc")
+        ) {
+            assert!(
+                result.is_err(),
+                "Expected a source diagnostic for {}",
+                path.display()
+            );
+            continue;
+        }
+        let original = result.unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        for program in [&original, &optimize_bytecode(&original)] {
+            for function in &program.functions {
+                maximum_stack_height(program, function)
+                    .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            }
+        }
+    }
 }
 
 fn assert_peaks(source: &[u8], expected: &[(&str, usize, usize)]) {
@@ -215,5 +343,64 @@ fn a_return_rejects_leftover_temporaries() {
     assert_eq!(
         result.unwrap_err(),
         "main at instruction 2: RETURN requires stack height 1. Found 2."
+    );
+}
+
+#[test]
+fn a_skipped_add_still_requires_two_integers() {
+    let result = check_instructions(&[
+        Op::LoadConstant(0), // true
+        Op::JumpIfTrue(6),
+        Op::LoadConstant(1), // int
+        Op::LoadConstant(0), // bool
+        Op::Add,
+        Op::Return,
+        Op::LoadConstant(1),
+        Op::Return,
+    ]);
+    assert_eq!(
+        result.unwrap_err(),
+        "main at instruction 4: ADD expects int for operand 2. Found bool."
+    );
+}
+
+#[test]
+fn a_join_compares_types_below_the_top_of_the_stack() {
+    let result = check_instructions(&[
+        Op::LoadConstant(0),
+        Op::JumpIfTrue(5),
+        Op::LoadConstant(1),
+        Op::LoadConstant(1),
+        Op::Jump(7),
+        Op::LoadConstant(0),
+        Op::LoadConstant(1),
+        Op::Pop,
+        Op::Pop,
+        Op::LoadConstant(1),
+        Op::Return,
+    ]);
+    assert_eq!(
+        result.unwrap_err(),
+        "main at instruction 7: Paths supply int and bool at stack slot 0."
+    );
+}
+
+#[test]
+fn equality_accepts_two_booleans_and_rejects_mixed_types() {
+    let compare = |right| {
+        check_instructions(&[
+            Op::LoadConstant(0),
+            Op::LoadConstant(right),
+            Op::Equal,
+            Op::Not,
+            Op::Pop,
+            Op::LoadConstant(1),
+            Op::Return,
+        ])
+    };
+    assert_eq!(compare(0), Ok(2));
+    assert_eq!(
+        compare(1).unwrap_err(),
+        "main at instruction 2: EQUAL expects bool for operand 2. Found int."
     );
 }
