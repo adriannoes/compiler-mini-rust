@@ -15,6 +15,7 @@ Both paths must agree on results, errors, and source positions.
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Complete |
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Complete |
 | 9 | Reproducible loop study in Mini-C and Rust | Local slots, LLVM IR, and values across loop iterations | Complete |
+| 10 | Read control-flow graphs from bytecode | Basic blocks, loop edges, and unreachable code | Complete |
 
 ## Phase 1
 
@@ -289,3 +290,9 @@ The [trace](../labs/loop-ir/README.md#trace-one-iteration) follows the second it
 
 The three Mini-C modes and two native Rust builds each produced the expected results for all five limits.
 The study records the compiler version with each pair of LLVM listings so readers can identify differences between toolchains.
+
+## Phase 10
+
+The [control-flow exercise](control-flow.md) maps the jumps in two bytecode listings.
+In `sum_next`, the loop body jumps back to the condition at instruction 14.
+In the optimization example, a constant condition selects the true branch. The five original blocks become one block, and all three engines return 24.
