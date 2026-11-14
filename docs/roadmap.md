@@ -16,6 +16,7 @@ Both paths must agree on results, errors, and source positions.
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Complete |
 | 9 | Reproducible loop study in Mini-C and Rust | Local slots, LLVM IR, and values across loop iterations | Complete |
 | 10 | Read control-flow graphs from bytecode | Basic blocks, loop edges, and unreachable code | Complete |
+| 11 | Check stack heights in bytecode tests | Operands, calls, and equal heights where paths meet | Complete |
 
 ## Phase 1
 
@@ -296,3 +297,9 @@ The study records the compiler version with each pair of LLVM listings so reader
 The [control-flow exercise](control-flow.md) maps the jumps in two bytecode listings.
 In `sum_next`, the loop body jumps back to the condition at instruction 14.
 In the optimization example, a constant condition selects the true branch. The five original blocks become one block, and all three engines return 24.
+
+## Phase 11
+
+The [stack exercise](stack-height.md) traces the arguments of a nested call and the two paths through a short circuit.
+The tests calculate the maximum stack height of each function before and after optimization.
+They also identify the function and instruction where malformed bytecode requires a missing operand or brings different heights to the same instruction.
