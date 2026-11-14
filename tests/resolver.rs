@@ -78,3 +78,40 @@ fn empty_program_has_only_the_global_scope() {
         "Resolution\n  Scope #0 GLOBAL @1:1\n"
     );
 }
+
+#[test]
+fn public_ast_rejects_a_declaration_used_directly_as_a_control_flow_body() {
+    use compiler_mini_rust::ast::Stmt;
+    use compiler_mini_rust::{InterpretError, check_types, compile_bytecode, interpret};
+
+    for control in ["if (false)", "if (true) ; else", "while (false)"] {
+        let source = format!("int main() {{ {control} {{\n  int x = 7;\n}} return x; }}");
+        let mut ast = parse(&lex(source.as_bytes()).unwrap()).unwrap();
+        let body = match &mut ast.functions[0].body.statements[0] {
+            Stmt::If {
+                else_branch: Some(body),
+                ..
+            } => body,
+            Stmt::If { then_branch, .. } => then_branch,
+            Stmt::While { body, .. } => body,
+            _ => unreachable!(),
+        };
+        let Stmt::Block(block) = body.as_mut() else {
+            unreachable!()
+        };
+        **body = block.statements.pop().unwrap();
+
+        let error = resolve_names(&ast).unwrap_err();
+        assert_eq!(error.position, Position { line: 2, column: 3 });
+        assert_eq!(
+            error.message,
+            "A variable declaration must appear directly in a block."
+        );
+        assert_eq!(check_types(&ast).unwrap_err(), error);
+        assert_eq!(compile_bytecode(&ast).unwrap_err(), error);
+        assert_eq!(
+            interpret(&ast, "main"),
+            Err(InterpretError::Analysis(error))
+        );
+    }
+}

@@ -263,7 +263,20 @@ impl<'p> Resolver<'p> {
 
     fn block(&mut self, scope: usize, block: &'p Block) -> Result<(), AnalysisError> {
         for stmt in &block.statements {
-            self.statement(scope, stmt)?;
+            if let Stmt::Variable {
+                name,
+                ty,
+                initializer,
+                ..
+            } = stmt
+            {
+                self.declare(scope, name, SymbolKind::Variable, *ty)?;
+                if let Some(expr) = initializer {
+                    self.expression(scope, expr)?;
+                }
+            } else {
+                self.statement(scope, stmt)?;
+            }
         }
         Ok(())
     }
@@ -274,16 +287,11 @@ impl<'p> Resolver<'p> {
                 let child = self.child_scope(scope, ScopeKind::Block, block.position);
                 self.block(child, block)?;
             }
-            Stmt::Variable {
-                name,
-                ty,
-                initializer,
-                ..
-            } => {
-                self.declare(scope, name, SymbolKind::Variable, *ty)?;
-                if let Some(expr) = initializer {
-                    self.expression(scope, expr)?;
-                }
+            Stmt::Variable { ty, .. } => {
+                return Err(AnalysisError {
+                    position: ty.position,
+                    message: "A variable declaration must appear directly in a block.".into(),
+                });
             }
             Stmt::Return {
                 value: Some(expr), ..
