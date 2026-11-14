@@ -8,7 +8,7 @@ The [roadmap](docs/roadmap.md) records the study phases.
 
 ## Run a program
 
-Use a Rust toolchain that supports the 2024 edition. From the repository root, run the recursive [factorial example](examples/factorial.mc).
+Use Rust 1.88 or later. From the repository root, run the recursive [factorial example](examples/factorial.mc).
 
 ```sh
 cargo run --quiet -- --run examples/factorial.mc
