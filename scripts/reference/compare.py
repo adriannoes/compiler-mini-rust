@@ -11,9 +11,11 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+from cargo_artifacts import build_executables
 from compare_cli import compare
 
-HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 MODES = (
     "--tokens", "--ast", "--resolve", "--check", "--bytecode", "--bytecode-opt",
@@ -32,17 +34,16 @@ def build(reference, work):
     subprocess.run(["cmake", "--build", cpp, "--parallel", "4"], check=True)
     subprocess.run(["ctest", "--test-dir", cpp, "--parallel", "4", "--output-on-failure"],
                    check=True)
+    builds = {}
     for profile in PROFILES:
         flags = ["--release"] if profile == "release" else []
-        for command in ("build", "test"):
-            subprocess.run(["cargo", command, "--locked", "--target-dir", rust, *flags],
-                           cwd=ROOT, check=True)
-        lib = rust / profile
-        subprocess.run([
-            "rustc", "--edition=2024", HERE / "limits.rs", "--extern",
-            f"compiler_mini_rust={lib / 'libcompiler_mini_rust.rlib'}",
-            "-L", f"dependency={lib / 'deps'}", "-o", work / f"limits-{profile}",
-        ], check=True)
+        builds[profile] = build_executables(
+            ROOT, "--bin", "compiler-mini-rust", "--example", "reference-limits",
+            "--target-dir", rust, *flags,
+        )
+        subprocess.run(["cargo", "test", "--locked", "--target-dir", rust, *flags],
+                       cwd=ROOT, check=True)
+    return builds
 
 
 def write_inputs(work, name, cases):
@@ -98,7 +99,7 @@ def compare_fixtures(build_dir, executables, work):
     return len(cases)
 
 
-def compare_limits(work, paths):
+def compare_limits(work, paths, builds):
     budgets = range(1, 81)
     depths = (1, 2, 4)
     engines = ("interpreter", "VM", "optimized VM")
@@ -112,7 +113,7 @@ def compare_limits(work, paths):
 
     expected = outcomes(work / "cpp" / "compare_limits")
     for profile in PROFILES:
-        actual = outcomes(work / f"limits-{profile}")
+        actual = outcomes(builds[profile]["reference-limits"])
         for index, (path, steps, depth) in enumerate(scenarios):
             start = index * len(engines)
             for offset, engine in enumerate(engines):
@@ -128,10 +129,10 @@ def compare_limits(work, paths):
 
 def validate(reference, work):
     paths = example_paths(ROOT / "examples", reference / "examples")
-    build(reference, work)
+    builds = build(reference, work)
     cpp = work / "cpp"
     executables = [cpp / "reference" / "minic"]
-    executables.extend(work / "rust" / p / "compiler-mini-rust" for p in PROFILES)
+    executables.extend(builds[p]["compiler-mini-rust"] for p in PROFILES)
     programs = json.loads((HERE / "programs.json").read_text(encoding="ascii"))
     paths.extend(write_inputs(work, "cli", programs["cli"]))
     paths.append(ROOT / "examples")
@@ -142,7 +143,7 @@ def validate(reference, work):
     fixtures = compare_fixtures(cpp, executables, work)
     limit_paths = [ROOT / "examples" / f"{name}.mc" for name in ("optimization", "arrays", "array_error")]
     limit_paths.extend(write_inputs(work, "limits", programs["limits"]))
-    limits = compare_limits(work, limit_paths)
+    limits = compare_limits(work, limit_paths, builds)
     print(f"Each Rust profile matched {len(commands)} direct CLI calls and {fixtures} reference CLI fixtures.")
     print(f"All three engines matched C++ at {limits} combinations of input, step budget, and call depth per profile.")
 

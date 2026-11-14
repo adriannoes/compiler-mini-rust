@@ -3,3 +3,7 @@ name = "compiler-mini-rust"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
+
+[[example]]
+name = "reference-limits"
+path = "scripts/reference/limits.rs"
