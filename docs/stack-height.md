@@ -43,8 +43,24 @@ In the original listing, instruction 23 consumes the condition for `true || (1 /
 The verifier follows both edges and checks that the heights agree at 36. The VM takes the jump to 35 and skips the division.
 The original graph has a peak of two. The optimizer removes the skipped branch, so the optimized graph has a peak of one.
 
-At a loop, the same rule applies. The first entry and the jump back to the condition must supply the same height.
-The verifier records the height on the first visit. When another edge supplies that height, the verifier can skip a second visit.
+At a loop, the first entry and the jump back to the condition must supply the same stack.
+The verifier records the operand types in order on the first visit. If another edge supplies the same sequence, the verifier can skip a second visit.
+
+## Trace operand types
+
+Read each stack from bottom to top. In the short-circuit example, the division takes two integers and produces one integer.
+The comparison at 33 consumes two integers and produces a boolean. Both paths reach instruction 36 with the stack `[bool]`.
+
+The tests build two instruction sequences to show how a type error can survive a height check.
+
+| Instruction in the test | Incoming stack | Why the verifier reports an error |
+|---|---|---|
+| `ADD` at 4 in `main` | `[int, bool]` | The second operand must be an integer. The verifier visits this branch even though its condition skips the addition during execution. |
+| `POP` at 7 in `main` | `[int, int]` on one path and `[bool, int]` on the other | The heights and top types agree. The bottom types differ at slot zero. |
+
+The verifier uses the declared types of locals, array elements, parameters, and return values.
+A conditional jump requires a boolean, and an array index requires an integer.
+The VM checks values during execution, including array bounds and division by zero.
 
 ## Run the tests
 
@@ -56,4 +72,4 @@ cargo test --locked --lib stack_analysis
 
 The tests compare peaks for the original and optimized examples. They also pass malformed instruction sequences to the verifier.
 One sequence reaches `ADD` at instruction 3 of `main` with only one operand. Another reaches instruction 3 with heights zero and one.
-The verifier reports the function and the instruction in each case. Operand types and runtime values are outside the scope of this analysis.
+The verifier reports the function and the instruction in each case. The tests also check operand types for each example that compiles, before and after optimization.

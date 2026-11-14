@@ -17,6 +17,7 @@ Both paths must agree on results, errors, and source positions.
 | 9 | Reproducible loop study in Mini-C and Rust | Local slots, LLVM IR, and values across loop iterations | Complete |
 | 10 | Read control-flow graphs from bytecode | Basic blocks, loop edges, and unreachable code | Complete |
 | 11 | Check stack heights in bytecode tests | Operands, calls, and equal heights where paths meet | Complete |
+| 12 | Check operand types in bytecode tests | Instruction signatures and matching types where paths meet | Complete |
 
 ## Phase 1
 
@@ -303,3 +304,9 @@ In the optimization example, a constant condition selects the true branch. The f
 The [stack exercise](stack-height.md) traces the arguments of a nested call and the two paths through a short circuit.
 The tests calculate the maximum stack height of each function before and after optimization.
 They also identify the function and instruction where malformed bytecode requires a missing operand or brings different heights to the same instruction.
+
+## Phase 12
+
+The [operand exercise](stack-height.md#trace-operand-types) follows the type of each temporary value through the bytecode.
+The verifier checks each instruction against its operand types and compares every stack slot where paths meet.
+The tests cover the original and optimized bytecode for each example that compiles, including programs that report errors during execution.
