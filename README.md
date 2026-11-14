@@ -5,6 +5,7 @@ The lexer separates source bytes into 35 kinds of tokens, including keywords, id
 The parser builds an abstract syntax tree (AST) for functions with scalars and local arrays. Semantic analysis connects names to declarations and checks types.
 The interpreter executes the AST. The bytecode compiler translates the same tree into instructions for a stack virtual machine (VM).
 The [roadmap](docs/roadmap.md) records the study phases.
+The [loop study](labs/loop-ir/README.md) traces one iteration in Mini-C bytecode and in the LLVM instructions that Rust generates.
 
 ## Run a program
 

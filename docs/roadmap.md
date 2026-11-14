@@ -14,6 +14,7 @@ Both paths must agree on results, errors, and source positions.
 | 6 | Bytecode compiler and VM | Stack instructions, branches, calls, and source positions | Complete |
 | 7 | Local optimizations, arrays, and comparison with C++ | Constant folding, side effects, array bounds, and equivalent behavior | Complete |
 | 8 | Review, tests, and publication documentation | Differential testing and language limits | Complete |
+| 9 | Reproducible loop study in Mini-C and Rust | Local slots, LLVM IR, and values across loop iterations | Complete |
 
 ## Phase 1
 
@@ -279,3 +280,12 @@ The final run used C++ commit `40f1984`. All 398 CTest cases passed. All 92 Rust
 | Direct CLI calls | All 497 matched, including all nine modes on the Rust-only example [return_42.mc](../examples/return_42.mc). |
 | CTest CLI cases | All 205 matched on standard output, standard error, and exit status. |
 | Execution limits | All three engines matched C++ at all 3,600 combinations of program, step budget, and call depth. |
+
+## Phase 9
+
+The [loop study](../labs/loop-ir/README.md) follows the same index and running total through Mini-C bytecode and Rust-generated LLVM IR.
+The bytecode updates local slots. In the optimized IR, two `phi` instructions select the values for the next iteration.
+The [trace](../labs/loop-ir/README.md#trace-one-iteration) follows the second iteration with a limit of 4.
+
+The three Mini-C modes and two native Rust builds each produced the expected results for all five limits.
+The study records the compiler version with each pair of LLVM listings so readers can identify differences between toolchains.
