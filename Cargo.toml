@@ -3,6 +3,9 @@ name = "compiler-mini-rust"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
+license = "MIT"
+description = "Educational Mini-C compiler in Rust with a bytecode VM, local optimizations, and checked arrays."
+repository = "https://github.com/adriannoes/compiler-mini-rust"
 
 [[example]]
 name = "reference-limits"

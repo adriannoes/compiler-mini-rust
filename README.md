@@ -200,3 +200,7 @@ The script runs every Rust example through all nine modes in both implementation
 It compares standard output and standard error byte for byte, along with the exit status.
 It also compares the three engines at each step budget and call depth.
 If a comparison fails, the script exits with a nonzero status and reports the case.
+
+## License
+
+This project uses the [MIT License](LICENSE).
