@@ -1,7 +1,7 @@
 # Mini-C in Rust
 
-This project continues the compiler study that began with [Mini-C in C++](https://github.com/adriannoes/compiler-mini-c).
-It implements the same language in Rust. The C++ project provides the language rules and example programs that the two compilers share.
+This Rust compiler uses the language rules and example programs from [Mini-C in C++](https://github.com/adriannoes/compiler-mini-c), the original implementation.
+[Mini-C in Python](https://github.com/adriannoes/compiler-mini-python) is the third implementation. Its README compares how the three compilers represent syntax trees and execute function calls.
 
 The lexer separates source bytes into 35 kinds of tokens, including keywords, identifiers, operators, and the end of input.
 The parser builds an abstract syntax tree (AST) for functions with scalars and local arrays. Semantic analysis connects names to declarations and checks types.
